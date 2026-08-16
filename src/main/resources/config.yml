@@ -1,0 +1,43 @@
+# ==============================================================
+# CursedValleyMobsAndMob
+# Sadece asagidaki dunyada calisir (Multiverse'teki ad ile ayni olmali).
+# ==============================================================
+
+world: cursedvalley
+
+# Kac saniyede bir can yenilensin (iki boss icin de gecerli)
+regen-seconds: 10
+
+crystal:
+  # Kac saatte bir dogsun
+  interval-hours: 3
+  x: 0
+  y: -47
+  z: 0
+  max-health: 50000
+  regen-amount: 200
+
+overlord:
+  max-health: 100000
+  regen-amount: 300
+  ability:
+    # Kac saniyede bir yetenek denensin
+    interval-seconds: 10
+    # Cember gosterildikten kac saniye sonra vursun
+    warn-seconds: 1
+    radius: 10
+    # 4 hasar = 2 kalp
+    damage: 4
+    knockback: 1.1
+
+# Droplar komutla ayarlanir, elle duzenlemene gerek yok:
+#   /cvmobs drops crystal set              (sandiga bakarken)
+#   /cvmobs drops crystal chance 35
+# chance: 0.0 - 1.0 arasi (0.35 = %35 ihtimalle bir esya duser)
+drops:
+  crystal:
+    chance: 0.5
+    items: []
+  overlord:
+    chance: 0.5
+    items: []
