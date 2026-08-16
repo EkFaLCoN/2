@@ -23,5 +23,5 @@ jobs:
       - name: Jar'i yukle
         uses: actions/upload-artifact@v4
         with:
-          name: CursedValleyMobsAndMob-jar
-          path: target/CursedValleyMobsAndMob.jar
+          name: CursedValleyRules-jar
+          path: target/CursedValleyRules.jar
