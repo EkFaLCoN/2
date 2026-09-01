@@ -136,6 +136,9 @@ dragon:
   spawn-radius: 40
   # Zeminden kac blok yukarida belirsin
   hover-height: 14.0
+  # Arena zemin yuksekligi. Bowl yeraltinda oldugu icin dunyanin yuzeyi
+  # kullanilamaz. Bos birakilirsa kristalin Y'si alinir.
+  arena-y: -47
   # Kac saniyede bir yetenek kullansin (can %50 altinda 3 saniye kisalir)
   ability-interval: 9
   regen-amount: 300

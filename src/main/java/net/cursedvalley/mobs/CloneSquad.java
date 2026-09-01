@@ -80,7 +80,8 @@ public final class CloneSquad {
         for (int i = 0; i < count; i++) {
             double a = (2 * Math.PI * i) / count;
             Location at = center.clone().add(Math.cos(a) * 7.0, 0, Math.sin(a) * 7.0);
-            at.setY(w.getHighestBlockYAt(at) + 1.0);
+            // Bossun kendi yuksekligine gore zemin ara -- yuzey degil.
+            at = Ground.findNear(at, center.getY());
 
             Giant g = w.spawn(at, Giant.class, e -> {
                 e.addScoreboardTag(TAG);

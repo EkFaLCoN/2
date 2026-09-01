@@ -54,6 +54,8 @@ public final class LizardDragon {
     private double maxHealth = 200_000;
     private int spawnRadius = 40;
     private double hoverHeight = 14.0;
+    /** Arena zemin yuksekligi (kristalin Y'si). Yeraltinda oldugu icin sart. */
+    private double arenaY = 0;
     private int abilityInterval = 9;          // saniye
     private double breathDamage = 20, breathRange = 22, breathAngle = 40;
     private double fireballDamage = 16, fireballRadius = 3.5;
@@ -70,6 +72,8 @@ public final class LizardDragon {
     public LizardDragon(JavaPlugin plugin) {
         this.plugin = plugin;
     }
+
+    public void setArenaY(double y) { this.arenaY = y; }
 
     public void configure(double maxHealth, int spawnRadius, double hoverHeight,
                           int abilityInterval, double breathDamage, double breathRange,
@@ -112,8 +116,9 @@ public final class LizardDragon {
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         double a = rnd.nextDouble() * Math.PI * 2;
         double r = spawnRadius * Math.sqrt(rnd.nextDouble());   // alana esit dagilim
-        Location at = new Location(w, Math.cos(a) * r, 0, Math.sin(a) * r);
-        at.setY(w.getHighestBlockYAt(at) + hoverHeight);
+        Location at = new Location(w, Math.cos(a) * r, arenaY, Math.sin(a) * r);
+        // Arena yeraltinda; yuzey degil, arena zemini referans alinir.
+        at = Ground.hoverNear(at, arenaY, hoverHeight);
 
         dragon = w.spawn(at, EnderDragon.class, d -> {
             d.addScoreboardTag(TAG);
@@ -350,8 +355,8 @@ public final class LizardDragon {
         for (int i = 0; i < count; i++) {
             double a = rnd.nextDouble() * Math.PI * 2;
             double r = 25 * Math.sqrt(rnd.nextDouble());
-            Location target = center.clone().add(Math.cos(a) * r, 0, Math.sin(a) * r);
-            target.setY(w.getHighestBlockYAt(target) + 1);
+            Location target = Ground.findNear(
+                    center.clone().add(Math.cos(a) * r, 0, Math.sin(a) * r), center.getY());
 
             plugin.getServer().getScheduler().runTaskLater(plugin,
                     () -> dropFireball(target), i * 4L);

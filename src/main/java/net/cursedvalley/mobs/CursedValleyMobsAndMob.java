@@ -145,7 +145,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
      * Yeni bir ayar eklendiginde ya da bir varsayilan degistiginde sunucuda eski
      * deger okunmaya devam ediyordu (meteor sayisinin 11'de kalmasi bu yuzdendi).
      */
-    private static final int CONFIG_VERSION = 11;
+    private static final int CONFIG_VERSION = 12;
 
     // ==================== ACILIS ====================
 
@@ -261,6 +261,8 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
                 c.getDouble("dragon.tail.damage", 24),
                 c.getDouble("dragon.tail.radius", 9),
                 c.getInt("dragon.fire-ticks", 100));
+        // Ejder arenanin zemin yuksekligini bilmeli -- bowl yeraltinda.
+        dragon.setArenaY(c.getDouble("dragon.arena-y", crystalY));
         dragonRegen        = c.getDouble("dragon.regen-amount", 300);
         dragonRegenSeconds = Math.max(1, c.getInt("dragon.regen-seconds", 10));
 
@@ -679,6 +681,20 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         overlord.setInvulnerable(true);
         if (customModel) model.hide(true);
 
+        // Guvenlik agi: herhangi bir sebeple cikis calismazsa boss sonsuza
+        // kadar gorunmez ve dokunulmaz kalmasin.
+        getServer().getScheduler().runTaskLater(this, () -> {
+            if (diving) {
+                diving = false;
+                if (overlord != null && !overlord.isDead()) {
+                    overlord.setInvisible(customModel);
+                    overlord.setAI(true);
+                    overlord.setInvulnerable(false);
+                    if (customModel) model.hide(false);
+                }
+            }
+        }, 160L);
+
         // Hedef, dalis bittiginde secilir; oyuncu kacarsa da altindan cikar.
         getServer().getScheduler().runTaskLater(this, () -> {
             if (overlord == null || overlord.isDead()) { diving = false; return; }
@@ -698,7 +714,9 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
             // Tam ustunde degil, YANINDA cikar -- oyuncu sikismasin.
             double ang = ThreadLocalRandom.current().nextDouble() * Math.PI * 2;
             out.add(Math.cos(ang) * 3.0, 0, Math.sin(ang) * 3.0);
-            out.setY(out.getWorld().getHighestBlockYAt(out) + 1.0);
+            // Hedefin kendi yuksekligine gore zemin ara -- yuzey degil.
+            double refY = (target != null ? target.getLocation() : start).getY();
+            out = Ground.findNear(out, refY);
 
             // Cikmadan once zemin titresir -- kacacak zaman kalsin.
             World world = out.getWorld();
