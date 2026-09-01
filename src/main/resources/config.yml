@@ -106,6 +106,9 @@ overlord:
       clones:
         count: 10
         health: 5000
+        # Yakin dovus hasari
+        melee-damage: 10.0
+        # Ziplama darbesi ayrica ayarlanmaz -- overlord.ability.damage ile ayni
         # Rig olcegi (boss 4.0). 1.6 ~ 4.6 blok boy.
         scale: 1.6
         # Overlord'unkinden zayif itis

@@ -28,13 +28,22 @@ public final class BossState {
 
     /** Turuncu isaretlerin oldugu can yuzdeleri -- her biri bir kez tetiklenir. */
     private static final double[] PHASES = {0.75, 0.50, 0.25};
-    private static final TextColor MARK = TextColor.color(0xFF8C1A);
+    private static final TextColor MARK_ORANGE = TextColor.color(0xFF8C1A);
+    private static final TextColor MARK_AQUA   = TextColor.color(0x4DE3FF);
     private int phasesTaken = 0;
 
+    /** Esik isaretleri sadece faz yetenegi olan bosta cizilir (Overlord). */
+    private final boolean phaseMarkers;
+
     public BossState(String label, double maxHealth) {
+        this(label, maxHealth, false);
+    }
+
+    public BossState(String label, double maxHealth, boolean phaseMarkers) {
         this.label = label;
         this.maxHealth = maxHealth;
         this.health = maxHealth;
+        this.phaseMarkers = phaseMarkers;
     }
 
     public double health()    { return health; }
@@ -67,7 +76,7 @@ public final class BossState {
      * Her esik yalnizca bir kez doner.
      */
     public int takePhase() {
-        if (maxHealth <= 0) return 0;
+        if (!phaseMarkers || maxHealth <= 0) return 0;
         double ratio = health / maxHealth;
         if (phasesTaken >= PHASES.length) return 0;
         if (ratio > PHASES[phasesTaken]) return 0;
@@ -91,17 +100,24 @@ public final class BossState {
                 : NamedTextColor.RED;
 
         // Esik yuvalari: %75 -> 15. yuva, %50 -> 10, %25 -> 5.
+        // Yalnizca faz yetenegi olan bosta cizilir.
         boolean[] mark = new boolean[slots];
-        for (double ph : PHASES) {
-            int idx = (int) Math.round(ph * slots);
-            if (idx >= 0 && idx < slots) mark[idx] = true;
+        if (phaseMarkers) {
+            for (double ph : PHASES) {
+                int idx = (int) Math.round(ph * slots);
+                if (idx >= 0 && idx < slots) mark[idx] = true;
+            }
         }
+
+        // Bar altin/kirmiziya donunce turuncu isaret barin icinde kayboluyor;
+        // o durumda isaretler zit bir maviye geciyor.
+        TextColor markColor = (barColor == NamedTextColor.GREEN) ? MARK_ORANGE : MARK_AQUA;
 
         Component bar = Component.empty();
         for (int i = 0; i < slots; i++) {
             // Isaretler dolu ya da bos olsun her zaman turuncu gorunur.
             bar = bar.append(Component.text("|",
-                    mark[i] ? MARK : (i < filled ? barColor : NamedTextColor.DARK_GRAY)));
+                    mark[i] ? markColor : (i < filled ? barColor : NamedTextColor.DARK_GRAY)));
         }
 
         return Component.text(label + "  ", NamedTextColor.LIGHT_PURPLE)

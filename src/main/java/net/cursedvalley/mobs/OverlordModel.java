@@ -112,6 +112,12 @@ public final class OverlordModel {
     private boolean armOverride;
     private int overrideLeft;
 
+    /** Gurz Firtinasi: iki elle tutup donme. */
+    private int stormLeft;
+    private double stormSpin;
+    /** Firtina sonrasi sarsilma. */
+    private int staggerLeft;
+
     public OverlordModel(JavaPlugin plugin) {
         this(plugin, BOSS_SCALE);
     }
@@ -255,6 +261,27 @@ public final class OverlordModel {
         maceLeft = Math.max(10, ticks);
     }
 
+    /**
+     * Gurz Firtinasi duruşu: gurz IKI ELLE tutulur (iki kol da one uzanir,
+     * gurz ellerin arasinda ortada durur) ve boss kendi ekseninde doner.
+     */
+    public void playStorm(int ticks) {
+        stormLeft = Math.max(1, ticks);
+        maceActive = false;
+        maceCur = 0f;
+        atkTick = -1;
+    }
+
+    /** Firtinadan sonra sersemleme: govde saga sola sallanir. */
+    public void playStagger(int ticks) {
+        staggerLeft = Math.max(1, ticks);
+        stormLeft = 0;
+    }
+
+    public boolean stormActive() {
+        return stormLeft > 0;
+    }
+
     // ==================== HER TICK ====================
 
     public void tick(Giant giant) {
@@ -315,11 +342,35 @@ public final class OverlordModel {
                 atkTick = -1; atkAngle = 0f; atkYaw = 0f;
             }
         }
+        // --- Gurz Firtinasi ---
+        boolean twoHanded = false;
+        float spinDeg = 0f;
+        if (stormLeft > 0) {
+            stormLeft--;
+            twoHanded = true;
+            stormSpin += 26.0;              // tur basina ~14 tick
+            spinDeg = (float) stormSpin;
+            if (stormLeft == 0) stormSpin = 0;
+        }
+
+        // --- sarsilma ---
+        float shake = 0f;
+        if (staggerLeft > 0) {
+            staggerLeft--;
+            shake = (float) (Math.toRadians(9) * Math.sin(staggerLeft * 0.9));
+        }
+
         boolean armBusy = armOverride || Math.abs(armCur) > 0.03f;
 
         float armR = armBusy ? armCur : -swing * 0.8f + idle;
         float armL = armBusy ? armCur : swing * 0.8f - idle;
         if (atkTick >= 0) armL = atkAngle;
+
+        // Iki elle tutus: her iki kol da one uzanir, gurz ortada kalir.
+        if (twoHanded) {
+            armR = (float) Math.toRadians(-92);
+            armL = (float) Math.toRadians(-92);
+        }
 
         // dizlerin bukulmesi (yer sarsma)
         if (crouchLeft > 0 && --crouchLeft == 0) crouchTarget = 0f;
@@ -340,7 +391,7 @@ public final class OverlordModel {
                 maceActive = false;
                 maceCur = 0f;
             }
-            armL = maceCur;
+            if (!twoHanded) armL = maceCur;
         }
 
         // --- govde: yalnizca gerektiginde isinla ---
@@ -349,15 +400,15 @@ public final class OverlordModel {
         boolean moved = lastSent == null
                 || lastSent.getWorld() != loc.getWorld()
                 || lastSent.distanceSquared(loc) > 0.0004
-                || Math.abs(lastYaw - yaw) > 0.6f;
+                || Math.abs(lastYaw - (yaw + spinDeg)) > 0.6f;
 
         Location base = loc.clone();
         base.setPitch(0f);
-        base.setYaw(yaw);
+        base.setYaw(yaw + spinDeg);
 
         if (moved) {
             lastSent = loc.clone();
-            lastYaw = yaw;
+            lastYaw = yaw + spinDeg;
             for (ItemDisplay d : parts.values()) {
                 if (d != null && !d.isDead()) d.teleport(base);
             }
@@ -397,7 +448,9 @@ public final class OverlordModel {
         float th   = leanCur + armL;
         float sinT = (float) Math.sin(th), cosT = (float) Math.cos(th);
         float sinY = (float) Math.sin(atkYaw), cosY = (float) Math.cos(atkYaw);
-        float handX = ARM_X   - ARM_LEN * sinT * sinY;
+        // Iki elle tutarken gurz govdenin tam onunde, ellerin ortasinda durur.
+        float maceBaseX = twoHanded ? 0f : ARM_X;
+        float handX = maceBaseX - ARM_LEN * sinT * sinY;
         float handY = shoulderY - ARM_LEN * cosT;
         float handZ = shoulderZ - ARM_LEN * sinT * cosY;
 
@@ -416,11 +469,11 @@ public final class OverlordModel {
                 }
                 case "torso" -> {
                     px = 0f; py = waist; pz = 0f;
-                    rot = new Quaternionf().rotateX(leanCur).rotateZ(idle * 0.4f);
+                    rot = new Quaternionf().rotateX(leanCur).rotateZ(idle * 0.4f + shake);
                 }
                 case "head" -> {
                     px = 0f; py = neckY; pz = neckZ;
-                    rot = new Quaternionf().rotateX(leanCur).rotateZ(idle * 0.4f);
+                    rot = new Quaternionf().rotateX(leanCur).rotateZ(idle * 0.4f + shake * 1.4f);
                 }
                 case "arm_r" -> {
                     px = b.x(); py = shoulderY; pz = shoulderZ;

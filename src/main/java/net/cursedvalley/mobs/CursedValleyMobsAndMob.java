@@ -95,6 +95,8 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
     private int unseenSeconds;
     /** Yeraltina dalis sirasinda melee/yetenek kapali. */
     private boolean diving;
+    /** Gurz Firtinasi + sersemleme suresince diger yetenekler ve melee durur. */
+    private boolean stormLock;
 
     /** Ganimet sandigi ayarlari: boss ve siradan yaratik icin ayri stil. */
     private boolean lootChestEnabled;
@@ -140,7 +142,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
      * Yeni bir ayar eklendiginde ya da bir varsayilan degistiginde sunucuda eski
      * deger okunmaya devam ediyordu (meteor sayisinin 11'de kalmasi bu yuzdendi).
      */
-    private static final int CONFIG_VERSION = 7;
+    private static final int CONFIG_VERSION = 8;
 
     // ==================== ACILIS ====================
 
@@ -220,6 +222,12 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         cloneScale     = c.getDouble("overlord.ability.phase.clones.scale", 1.6);
         cloneKnockback = c.getDouble("overlord.ability.phase.clones.knockback", 1.1);
         clones.setKnockback(cloneKnockback);
+        clones.setMelee(
+                c.getDouble("overlord.ability.phase.clones.melee-damage", 10.0),
+                c.getDouble("overlord.melee-reach", 4.0),
+                Math.max(5, c.getInt("overlord.melee-cooldown-ticks", 20)));
+        // Ziplama darbesi Overlord'un yere cakilmasiyla ayni hasari verir.
+        clones.setJumpDamage(c.getDouble("overlord.ability.damage", 26));
 
         stormRadius    = c.getDouble("overlord.ability.phase.storm.radius", 8.0);
         stormDamage    = c.getDouble("overlord.ability.phase.storm.damage", 18.0);
@@ -429,7 +437,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         var atk = overlord.getAttribute(Attribute.ATTACK_DAMAGE);
         if (atk != null) atk.setBaseValue(meleeDamage);
 
-        overlordState = new BossState("OVERLORD", overlordMaxHp);
+        overlordState = new BossState("OVERLORD", overlordMaxHp, true);
         overlord.customName(overlordState.bar());
 
         abilityCounter = 0;
@@ -437,6 +445,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         homeReached = false;
         unseenSeconds = 0;
         diving = false;
+        stormLock = false;
         clones.removeAll();
         lastMeleeTick.clear();
 
@@ -508,7 +517,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
      */
     private void meleeTick() {
         if (overlord == null || overlord.isDead()) return;
-        if (casting) return;
+        if (casting || stormLock || diving) return;
 
         Location center = overlord.getLocation();
         long now = center.getWorld().getFullTime();
@@ -551,46 +560,69 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         Location center = overlord.getLocation();
         World w = center.getWorld();
 
-        Bukkit.broadcast(Component.text("Overlord gürzünü savurmaya başladı!", NamedTextColor.GOLD));
+        Bukkit.broadcast(Component.text("Overlord gürzünü iki eline aldı!", NamedTextColor.GOLD));
         w.playSound(center, Sound.ENTITY_WARDEN_SONIC_CHARGE, SoundCategory.HOSTILE, 2.0f, 0.7f);
 
+        final int spinTicks = 5 * 14;        // 5 tur, tur basina 14 tick
+        final int staggerTicks = 40;         // 2 saniye sersemleme
+
+        // Firtina + sersemleme boyunca diger yetenekler ve melee kapali.
+        stormLock = true;
+        if (customModel) model.playStorm(spinTicks);
+
         new org.bukkit.scheduler.BukkitRunnable() {
-            int turns = 0;
+            int t = 0;
 
             @Override
             public void run() {
-                if (overlord == null || overlord.isDead() || turns >= 5) {
+                if (overlord == null || overlord.isDead()) {
+                    stormLock = false;
                     cancel();
                     return;
                 }
-                turns++;
-                Location c = overlord.getLocation();
-                World world = c.getWorld();
 
-                if (customModel) model.playAttack();
-                world.playSound(c, Sound.ENTITY_PLAYER_ATTACK_SWEEP, SoundCategory.HOSTILE, 1.6f, 0.8f);
+                if (t < spinTicks) {
+                    Location c = overlord.getLocation();
+                    World world = c.getWorld();
 
-                // Savrulan gurzun izi
-                for (int i = 0; i < 36; i++) {
-                    double a = (2 * Math.PI * i) / 36;
+                    // Her turda bir kez vurur; tur ~14 tick.
+                    if (t % 14 == 0) {
+                        world.playSound(c, Sound.ENTITY_PLAYER_ATTACK_SWEEP,
+                                SoundCategory.HOSTILE, 1.6f, 0.7f);
+                        for (Player p : world.getPlayers()) {
+                            if (p.getGameMode() == GameMode.SPECTATOR) continue;
+                            if (p.getLocation().distance(c) > stormRadius) continue;
+
+                            hurt(p, stormDamage);
+                            Vector push = p.getLocation().toVector().subtract(c.toVector());
+                            if (push.lengthSquared() < 0.01) push = new Vector(0, 0, 1);
+                            push.setY(0).normalize().multiply(stormKnockback);
+                            push.setY(0.55);
+                            p.setVelocity(p.getVelocity().add(push));
+                        }
+                    }
+
+                    // Donen gurzun izi
+                    double a = Math.toRadians(t * 26.0);
                     world.spawnParticle(Particle.SWEEP_ATTACK, c.clone().add(
-                            Math.cos(a) * stormRadius, 1.2, Math.sin(a) * stormRadius), 1, 0, 0, 0, 0);
+                            Math.cos(a) * stormRadius, 1.4, Math.sin(a) * stormRadius), 1, 0, 0, 0, 0);
+
+                } else if (t == spinTicks) {
+                    // Donme bitti: boss kendi hizindan sersemler.
+                    if (customModel) model.playStagger(staggerTicks);
+                    overlord.getWorld().playSound(overlord.getLocation(),
+                            Sound.ENTITY_RAVAGER_ROAR, SoundCategory.HOSTILE, 1.6f, 0.9f);
+                    Bukkit.broadcast(Component.text("Overlord sersemledi!", NamedTextColor.YELLOW));
+
+                } else if (t >= spinTicks + staggerTicks) {
+                    stormLock = false;
+                    cancel();
+                    return;
                 }
 
-                for (Player p : world.getPlayers()) {
-                    if (p.getGameMode() == GameMode.SPECTATOR) continue;
-                    double d = p.getLocation().distance(c);
-                    if (d > stormRadius) continue;
-
-                    hurt(p, stormDamage);
-                    Vector push = p.getLocation().toVector().subtract(c.toVector());
-                    if (push.lengthSquared() < 0.01) push = new Vector(0, 0, 1);
-                    push.setY(0).normalize().multiply(stormKnockback);
-                    push.setY(0.55);
-                    p.setVelocity(p.getVelocity().add(push));
-                }
+                t++;
             }
-        }.runTaskTimer(this, 25L, 12L);
+        }.runTaskTimer(this, 25L, 1L);
     }
 
     /**
@@ -621,8 +653,21 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         getServer().getScheduler().runTaskLater(this, () -> {
             if (overlord == null || overlord.isDead()) { diving = false; return; }
 
-            Player target = pickTarget();
+            // Yerde duran (ucmayan, yuzmeyen) oyuncular arasindan rasgele biri.
+            List<Player> grounded = new ArrayList<>();
+            for (Player p : start.getWorld().getPlayers()) {
+                if (p.getGameMode() == GameMode.SPECTATOR) continue;
+                if (!p.isOnGround()) continue;
+                if (p.getLocation().distance(start) > abilityRadius * 2) continue;
+                grounded.add(p);
+            }
+            Player target = grounded.isEmpty() ? pickTarget()
+                    : grounded.get(ThreadLocalRandom.current().nextInt(grounded.size()));
+
             Location out = (target != null ? target.getLocation() : start).clone();
+            // Tam ustunde degil, YANINDA cikar -- oyuncu sikismasin.
+            double ang = ThreadLocalRandom.current().nextDouble() * Math.PI * 2;
+            out.add(Math.cos(ang) * 3.0, 0, Math.sin(ang) * 3.0);
             out.setY(out.getWorld().getHighestBlockYAt(out) + 1.0);
 
             // Cikmadan once zemin titresir -- kacacak zaman kalsin.
@@ -1072,7 +1117,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
             }
 
             abilityCounter++;
-            if (!resetting && !diving && abilityCounter >= abilityInterval) {
+            if (!resetting && !diving && !stormLock && abilityCounter >= abilityInterval) {
                 abilityCounter = 0;
                 // Her turda yazi tura: ya yere cakilma ya meteor yagmuru.
                 if (ThreadLocalRandom.current().nextBoolean()) overlordAbility();

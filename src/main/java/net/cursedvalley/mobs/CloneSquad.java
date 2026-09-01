@@ -12,6 +12,8 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Giant;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.damage.DamageType;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
@@ -51,6 +53,7 @@ public final class CloneSquad {
         final Map<UUID, Double> attackers = new HashMap<>();
         int jumpTimer;
         boolean airborne;
+        long lastMelee;
 
         Clone(Giant entity, OverlordModel model, double health, int jumpTimer) {
             this.entity = entity;
@@ -173,6 +176,26 @@ public final class CloneSquad {
             // Vanilla can barini hep dolu tut; gercek can bizde.
             if (c.entity.getHealth() < 1024.0) c.entity.setHealth(1024.0);
 
+            // Giant'in vanilla AI'si yok -- hedefi elle takip eder.
+            Player near = nearest(c.entity.getLocation());
+            if (near != null) {
+                c.entity.setTarget(near);
+                if (near.getLocation().distance(c.entity.getLocation()) > 2.5) {
+                    c.entity.getPathfinder().moveTo(near, 1.1);
+                }
+
+                // Yakin dovus
+                long now = c.entity.getWorld().getFullTime();
+                if (now - c.lastMelee >= meleeCooldown
+                        && near.getLocation().distance(c.entity.getLocation()) <= meleeReach) {
+                    c.lastMelee = now;
+                    if (c.model != null) c.model.playAttack();
+                    c.entity.getWorld().playSound(c.entity.getLocation(),
+                            Sound.ENTITY_PLAYER_ATTACK_STRONG, SoundCategory.HOSTILE, 1.0f, 0.8f);
+                    hurt(c.entity, near, meleeDamage);
+                }
+            }
+
             if (--c.jumpTimer <= 0) {
                 c.jumpTimer = 200;      // 10 saniye
                 jump(c);
@@ -186,7 +209,19 @@ public final class CloneSquad {
         }
     }
 
-    /** Klon havaya siçrar; indiginde r=5 alandaki oyuncular geri savrulur. */
+    private Player nearest(Location at) {
+        Player best = null;
+        double bestD = Double.MAX_VALUE;
+        for (Player p : at.getWorld().getPlayers()) {
+            if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue;
+            if (p.getGameMode() == org.bukkit.GameMode.CREATIVE) continue;
+            double d = p.getLocation().distanceSquared(at);
+            if (d < bestD && d < 40 * 40) { bestD = d; best = p; }
+        }
+        return best;
+    }
+
+    /** Klon havaya siçrar; indiginde r=5 alanda hasar verip geri savurur. */
     private void jump(Clone c) {
         Location at = c.entity.getLocation();
         c.entity.setVelocity(new Vector(0, 0.62, 0));
@@ -209,7 +244,9 @@ public final class CloneSquad {
             double d = p.getLocation().distance(at);
             if (d > 5.0) continue;
 
-            // Yakindakiler daha sert savrulur; hasar yok, sadece itis.
+            // Darbe hasari Overlord'un yere cakilmasiyla ayni; itis daha zayif.
+            hurt(c.entity, p, jumpDamage);
+
             Vector push = p.getLocation().toVector().subtract(at.toVector());
             if (push.lengthSquared() < 0.01) push = new Vector(0, 0, 1);
             push.setY(0).normalize().multiply(knockback * (1.0 - d / 6.5));
@@ -221,9 +258,32 @@ public final class CloneSquad {
 
     /** Overlord'unkinden zayif itis gucu. */
     private double knockback = 1.1;
+    /** Yakin dovus hasari. */
+    private double meleeDamage = 10.0;
+    private double meleeReach = 4.0;
+    private int meleeCooldown = 20;
+    /** Ziplama darbesi -- Overlord'un yere cakilmasiyla ayni. */
+    private double jumpDamage = 26.0;
 
-    public void setKnockback(double v) {
-        this.knockback = v;
+    public void setKnockback(double v)   { this.knockback = v; }
+    public void setMelee(double dmg, double reach, int cooldownTicks) {
+        this.meleeDamage = dmg;
+        this.meleeReach = reach;
+        this.meleeCooldown = Math.max(1, cooldownTicks);
+    }
+    public void setJumpDamage(double v)  { this.jumpDamage = v; }
+
+    /**
+     * Klonun oyuncuya verdigi hasar. Bossla ayni mantik: MAGIC turu zirhi
+     * deler, yani config'teki sayi dogrudan cana isler.
+     */
+    private void hurt(Giant from, Player p, double amount) {
+        if (amount <= 0) return;
+        DamageSource src = DamageSource.builder(DamageType.MAGIC)
+                .withCausingEntity(from)
+                .withDirectEntity(from)
+                .build();
+        p.damage(amount, src);
     }
 
     // ==================== TEMIZLIK ====================
