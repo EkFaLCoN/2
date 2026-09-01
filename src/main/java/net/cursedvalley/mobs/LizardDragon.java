@@ -286,7 +286,7 @@ public final class LizardDragon {
             lastBite = now;
             model.playBite();
             dragon.getWorld().playSound(dragon.getLocation(),
-                    Sound.ENTITY_RAVAGER_BITE, SoundCategory.HOSTILE, 1.6f, 0.7f);
+                    Sound.ENTITY_RAVAGER_ROAR, SoundCategory.HOSTILE, 1.3f, 1.5f);
             hurt(target, biteDamage);
             target.setFireTicks(Math.max(target.getFireTicks(), fireTicks / 3));
         }
