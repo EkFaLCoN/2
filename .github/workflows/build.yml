@@ -1,3 +1,8 @@
+# CursedValleyMobsAndMob — jar derleme
+#
+# Depoda .github/workflows/build.yml yolunda durmali.
+# pom.xml kokte OLMAK ZORUNDA DEGIL -- asagidaki adim onu kendisi bulur,
+# yani zip'i acarken dosyalar bir alt klasore girmis olsa da calisir.
 name: Build
 
 on:
@@ -7,23 +12,43 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Kaynağı al
+      - name: Kaynagi al
         uses: actions/checkout@v4
 
+      # pom.xml nerede? Bulup sonraki adimlara aktarir.
+      - name: Proje klasorunu bul
+        id: find
+        run: |
+          POM=$(find . -name pom.xml -not -path "*/target/*" | head -n1)
+          if [ -z "$POM" ]; then
+            echo "pom.xml bulunamadi. Depodaki dosyalar:"
+            find . -maxdepth 3 -not -path "./.git/*" | head -50
+            exit 1
+          fi
+          DIR=$(dirname "$POM")
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+          echo "pom.xml burada: $DIR"
+
+      # Paper 26.x -> Java 25 (pom'da maven.compiler.release = 25)
       - name: Java 25 kur
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
+          # Onbellek anahtari icin pom'un gercek yolu
+          cache-dependency-path: ${{ steps.find.outputs.dir }}/pom.xml
 
       - name: Derle
+        working-directory: ${{ steps.find.outputs.dir }}
         run: mvn -B clean package
 
-      - name: Jar'ı yükle
+      # Actions > calisma > Artifacts altindan indirilir
+      - name: Jar'i yukle
         uses: actions/upload-artifact@v4
         with:
           name: CursedValleyMobsAndMob
-          path: target/*.jar
+          path: ${{ steps.find.outputs.dir }}/target/*.jar
           if-no-files-found: error
