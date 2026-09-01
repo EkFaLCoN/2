@@ -3,12 +3,12 @@ version: '${project.version}'
 main: net.cursedvalley.mobs.CursedValleyMobsAndMob
 api-version: '1.21'
 author: Cursed Valley
-description: Cursed Valley bosslari - Lanetli Kristal ve Overlord, sandiktan ayarlanan drop sistemi.
+description: Cursed Valley bosslari - Lanetli Kristal, Overlord ve Lizard Dragon.
 
 commands:
   cvmobs:
     description: Cursed Valley boss ve drop ayarlari
-    usage: /cvmobs [spawn|drops|reload]
+    usage: /cvmobs [dragon|spawn|drops|reload]
     permission: cursedvalley.admin
     aliases: [cvm, cvboss]
 

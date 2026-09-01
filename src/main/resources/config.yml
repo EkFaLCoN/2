@@ -121,6 +121,53 @@ overlord:
   # Kimse gormezse boss kendini toparlar: bu kadar saniye sonra cani %100 olur.
   unseen-reset-seconds: 30
 
+# ==================== LIZARD DRAGON ====================
+# Cursed Valley'in ates ejderi. /cvmobs dragon ile cagrilir,
+# /cvmobs dragon remove ile kaldirilir.
+#
+# 0,0 merkezli spawn-radius icinde rasgele bir noktada, hover-height
+# kadar yukseklikte belirir.
+#
+# HARITA KORUMASI: ejderin blok kirmasi, ates topu birakmasi ve zemini
+# tutusturmasi tamamen kapali. Tum hasar elle uygulanir.
+dragon:
+  max-health: 200000
+  # 0,0'dan kac blok icinde dogsun
+  spawn-radius: 40
+  # Zeminden kac blok yukarida belirsin
+  hover-height: 14.0
+  # Kac saniyede bir yetenek kullansin (can %50 altinda 3 saniye kisalir)
+  ability-interval: 9
+  regen-amount: 300
+  regen-seconds: 10
+  # Degdigi oyuncu kac tick yansin
+  fire-ticks: 100
+
+  # Alev Nefesi: hedefe dogru koni. Yandan kacilabilir.
+  breath:
+    damage: 20
+    range: 22
+    # Koninin yari acisi (derece) -- buyudukce kacmak zorlasir
+    angle: 40
+
+  # Ates Yagmuru: gokten dusen alev toplari, once yerde uyari cemberi
+  fireball:
+    damage: 16
+    radius: 3.5
+    count: 14
+
+  # Kanat Firtinasi: cevredekileri havalandirip savurur
+  gust:
+    damage: 12
+    radius: 13
+    knockback: 2.1
+
+  # Kuyruk Savurma: cok yakindakilere agir hasar, uyarisiz
+  tail:
+    damage: 24
+    radius: 9
+
+
 # ==================== GANIMET SANDIGI ====================
 # Odul yere esya olarak dokulmez; kazananin onune kutu gorunumlu bir kafa
 # duser. Sag tiklayinca envanteri acilir.

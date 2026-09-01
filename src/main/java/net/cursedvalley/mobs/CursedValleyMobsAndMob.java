@@ -84,6 +84,9 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
     private final DropRegistry drops = new DropRegistry();
     private final LootChest lootChest = new LootChest(this);
     private final CloneSquad clones = new CloneSquad(this);
+    private final LizardDragon dragon = new LizardDragon(this);
+    private double dragonRegen;
+    private int dragonRegenSeconds;
 
     /** Faz ayarlari. */
     private int cloneCount;
@@ -142,7 +145,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
      * Yeni bir ayar eklendiginde ya da bir varsayilan degistiginde sunucuda eski
      * deger okunmaya devam ediyordu (meteor sayisinin 11'de kalmasi bu yuzdendi).
      */
-    private static final int CONFIG_VERSION = 10;
+    private static final int CONFIG_VERSION = 11;
 
     // ==================== ACILIS ====================
 
@@ -172,6 +175,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
     public void onDisable() {
         lootChest.removeAll();
         clones.removeAll();
+        dragon.remove();
         removeCrystal();
         model.remove();
         if (overlord != null && !overlord.isDead()) overlord.remove();
@@ -239,6 +243,26 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         diveRadius     = c.getDouble("overlord.ability.phase.dive.radius", 4.5);
 
         unseenResetSeconds = Math.max(5, c.getInt("overlord.unseen-reset-seconds", 30));
+
+        dragon.configure(
+                c.getDouble("dragon.max-health", 200_000),
+                c.getInt("dragon.spawn-radius", 40),
+                c.getDouble("dragon.hover-height", 14.0),
+                c.getInt("dragon.ability-interval", 9),
+                c.getDouble("dragon.breath.damage", 20),
+                c.getDouble("dragon.breath.range", 22),
+                c.getDouble("dragon.breath.angle", 40),
+                c.getDouble("dragon.fireball.damage", 16),
+                c.getDouble("dragon.fireball.radius", 3.5),
+                c.getInt("dragon.fireball.count", 14),
+                c.getDouble("dragon.gust.damage", 12),
+                c.getDouble("dragon.gust.radius", 13),
+                c.getDouble("dragon.gust.knockback", 2.1),
+                c.getDouble("dragon.tail.damage", 24),
+                c.getDouble("dragon.tail.radius", 9),
+                c.getInt("dragon.fire-ticks", 100));
+        dragonRegen        = c.getDouble("dragon.regen-amount", 300);
+        dragonRegenSeconds = Math.max(1, c.getInt("dragon.regen-seconds", 10));
 
         lootChestEnabled = c.getBoolean("loot-chest.boss.enabled", true);
         bossChestStyle = new LootChest.Style(
@@ -308,6 +332,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         OverlordModel.cleanupLeftovers(w);
         LootChest.cleanupLeftovers(w);
         CloneSquad.cleanupLeftovers(w);
+        LizardDragon.cleanupLeftovers(w);
     }
 
     /** Her tick: modelin kemiklerini bossun uzerinde tut ve animasyonu isle. */
@@ -1065,6 +1090,8 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
     private void everySecond() {
         tickCounter++;
 
+        dragon.everySecond(dragonRegen, dragonRegenSeconds);
+
         // her ~7 saniyede bir kukreme
         if (overlord != null && !overlord.isDead() && tickCounter % 7 == 0) {
             soundIdle(overlord.getLocation());
@@ -1287,6 +1314,18 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
             return;
         }
 
+        // --- Lizard Dragon: cani elle tutuluyor ---
+        if (dragon.is(victim)) {
+            event.setCancelled(true);
+            if (attacker == null || macro) return;
+            double dmg = event.getFinalDamage() > 0 ? event.getFinalDamage() : event.getDamage();
+            List<UUID> hitters = dragon.hit(attacker, dmg);
+            if (hitters != null) {
+                giveDrops("dragon", hitters, victim.getLocation(), "Lizard Dragon");
+            }
+            return;
+        }
+
         // --- mini klonlar: canlari elle tutuluyor ---
         if (clones.isClone(victim)) {
             event.setCancelled(true);
@@ -1329,9 +1368,37 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         }
     }
 
+    /**
+     * Ejder haritayi yiyip bitirmesin.
+     *
+     * Ender Dragon iki ayri yoldan blok kirar: govdesinin degdigi bloklari
+     * dogrudan siler (EntityExplodeEvent degil, bu olay) ve ates topu birakir.
+     * Ikisi de burada kapatiliyor -- Cursed Valley'de tek bir blok bile
+     * kirilmamali.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onDragonBreakBlock(org.bukkit.event.entity.EntityChangeBlockEvent event) {
+        if (event.getEntity().getScoreboardTags().contains(LizardDragon.TAG)) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Ejderin nefesi ve ates toplari zemini tutusturmasin. */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onDragonFireball(org.bukkit.event.entity.EntitySpawnEvent event) {
+        if (!dragon.alive()) return;
+        if (!event.getEntity().getWorld().getName().equalsIgnoreCase(worldName)) return;
+        var type = event.getEntity().getType();
+        if (type == org.bukkit.entity.EntityType.DRAGON_FIREBALL
+                || type == org.bukkit.entity.EntityType.AREA_EFFECT_CLOUD) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onExplode(EntityExplodeEvent event) {
-        if (event.getEntity().getScoreboardTags().contains(TAG)) {
+        if (event.getEntity().getScoreboardTags().contains(TAG)
+                || event.getEntity().getScoreboardTags().contains(LizardDragon.TAG)) {
             event.blockList().clear();
         }
     }
@@ -1351,6 +1418,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         if (dead instanceof Player) return;
         if (dead.getScoreboardTags().contains(TAG)) return;          // boss / boss parcasi
         if (clones.isClone(dead)) return;                            // klonun kendi akisi var
+        if (dead.getScoreboardTags().contains(LizardDragon.TAG)) return;  // ejderin kendi akisi var
         if (overlord != null && BossState.same(dead, overlord)) return;
         if (!dead.getWorld().getName().equalsIgnoreCase(worldName)) return;
 
@@ -1465,6 +1533,24 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
             case "reload" -> {
                 loadSettings();
                 sender.sendMessage(Component.text("Ayarlar yeniden yüklendi.", NamedTextColor.GREEN));
+            }
+
+            case "dragon", "ejder" -> {
+                World w = world();
+                if (w == null) {
+                    sender.sendMessage(Component.text("Dünya bulunamadı: " + worldName,
+                            NamedTextColor.RED));
+                    return true;
+                }
+                if (args.length > 1 && args[1].equalsIgnoreCase("remove")) {
+                    dragon.remove();
+                    sender.sendMessage(Component.text("Lizard Dragon kaldırıldı.",
+                            NamedTextColor.GREEN));
+                } else {
+                    dragon.spawn(w);
+                    sender.sendMessage(Component.text("Lizard Dragon çağrıldı.",
+                            NamedTextColor.GREEN));
+                }
             }
 
             case "spawn" -> {
