@@ -146,7 +146,7 @@ public final class LizardDragon {
             if (sp != null) sp.setBaseValue(0.26);
             // Giant vanilla'da devasa; rig kendi olceginde ciziliyor.
             var sc = dragon.getAttribute(Attribute.SCALE);
-            if (sc != null) sc.setBaseValue(0.5);
+            if (sc != null) sc.setBaseValue(0.42);
         } catch (Exception ex) {
             plugin.getLogger().warning("Ejder nitelikleri ayarlanamadı: " + ex.getMessage());
         }

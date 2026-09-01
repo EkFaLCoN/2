@@ -32,14 +32,15 @@ public final class DragonModel {
 
     private static final float SCALE = 3.0f;
 
-    /** Bacak boyu -- kalca yuksekligi. */
-    private static final float HIP_Y = 2.25f;
-    /** Govde merkezinin yuksekligi. */
-    private static final float BODY_Y = 3.40f;
-    /** On ve arka bacaklarin govde uzerindeki z konumu. */
-    private static final float LEG_FRONT_Z = 1.35f;
-    private static final float LEG_BACK_Z = -1.35f;
-    private static final float LEG_X = 1.05f;
+    /** Kalca yuksekligi -- govde ve bacaklar buradan baslar. */
+    private static final float HIP_Y = 3.00f;
+    private static final float LEG_X = 0.90f;
+    /** Boyun dibinin kalcaya gore yuksekligi. */
+    private static final float NECK_Y = 4.35f;
+    private static final float NECK_Z = 0.85f;
+    /** Omuz (kanat eklemi). */
+    private static final float WING_X = 1.45f;
+    private static final float WING_Y = 3.60f;
 
     private final JavaPlugin plugin;
     private final Map<String, ItemDisplay> parts = new LinkedHashMap<>();
@@ -59,7 +60,7 @@ public final class DragonModel {
     }
 
     private static final String[] BONES = {
-            "torso", "head", "tail", "leg_fr", "leg_fl", "leg_br", "leg_bl", "wing_r", "wing_l"
+            "torso", "head", "tail", "tail2", "leg_r", "leg_l", "wing_r", "wing_l"
     };
 
     // ==================== YASAM DONGUSU ====================
@@ -145,6 +146,7 @@ public final class DragonModel {
         walked += step;
         float amp = (float) Math.min(1.0, step * 7.0);
         float swing = (float) (Math.toRadians(28) * amp * Math.sin(walked * 1.5));
+        float tailSwing = (float) (Math.sin(walked * 1.5 + Math.PI) * 0.26 * (0.4 + amp));
 
         // Govde nefes alip verir gibi hafifce yukari asagi
         float bob = (float) (Math.sin(walked * 3.0) * 0.06 * amp)
@@ -192,34 +194,44 @@ public final class DragonModel {
 
             switch (en.getKey()) {
                 case "torso" -> {
-                    py = BODY_Y + bob;
+                    py = HIP_Y + bob;
+                    // Yururken govde hafifce yana yatar
                     rot.rotateZ((float) (Math.sin(walked * 1.5) * 0.05 * amp));
                 }
                 case "head" -> {
-                    py = BODY_Y + 0.35f + bob;
-                    pz = 1.85f;
+                    py = HIP_Y + NECK_Y + bob;
+                    pz = NECK_Z;
                     rot.rotateX(headPitch)
-                       .rotateY((float) (Math.sin(walked * 0.75) * 0.10 * amp));
+                       .rotateY((float) (Math.sin(walked * 0.75) * 0.09 * amp));
                 }
                 case "tail" -> {
-                    py = BODY_Y - 0.05f + bob;
-                    pz = -1.85f;
-                    // Kuyruk yurume ile ters faza sallanir
-                    rot.rotateY((float) (Math.sin(walked * 1.5 + Math.PI) * 0.28 * (0.4 + amp)));
+                    py = HIP_Y + 0.05f + bob;
+                    pz = -1.05f;
+                    // Kuyruk yuruyusle ters faza sallanir -- denge gorunumu
+                    rot.rotateY(tailSwing).rotateX((float) Math.toRadians(-6));
                 }
-                // Capraz yuruyus: on-sag ile arka-sol ayni fazda.
-                case "leg_fr" -> { px = -LEG_X; py = HIP_Y; pz = LEG_FRONT_Z; rot.rotateX(swing); }
-                case "leg_bl" -> { px =  LEG_X; py = HIP_Y; pz = LEG_BACK_Z;  rot.rotateX(swing); }
-                case "leg_fl" -> { px =  LEG_X; py = HIP_Y; pz = LEG_FRONT_Z; rot.rotateX(-swing); }
-                case "leg_br" -> { px = -LEG_X; py = HIP_Y; pz = LEG_BACK_Z;  rot.rotateX(-swing); }
+                case "tail2" -> {
+                    // Ucun konumu ilk kuyruk kemiginin acisindan hesaplanir,
+                    // yoksa iki parca birbirinden ayrilir.
+                    float len = 2.0f;
+                    px = -(float) Math.sin(tailSwing) * len;
+                    py = HIP_Y - 0.35f + bob;
+                    pz = -1.05f - (float) Math.cos(tailSwing) * len;
+                    rot.rotateY(tailSwing * 1.6f).rotateX((float) Math.toRadians(-10));
+                }
+                // Iki ayak: ters fazda adim atar
+                case "leg_r" -> { px = -LEG_X; py = HIP_Y; rot.rotateX(swing); }
+                case "leg_l" -> { px =  LEG_X; py = HIP_Y; rot.rotateX(-swing); }
+                // Kanatlar: katli durur, yururken hafifce kabarir
                 case "wing_r" -> {
-                    px = -1.15f; py = BODY_Y + 0.55f + bob; pz = 0.4f;
-                    // Katli kanat, yururken hafifce kabarir
-                    rot.rotateZ((float) Math.toRadians(-18 - 6 * Math.sin(walked * 1.5)));
+                    px = -WING_X; py = HIP_Y + WING_Y + bob;
+                    rot.rotateZ((float) Math.toRadians(-10 - 7 * Math.sin(walked * 1.5)))
+                       .rotateY((float) Math.toRadians(14));
                 }
                 case "wing_l" -> {
-                    px = 1.15f; py = BODY_Y + 0.55f + bob; pz = 0.4f;
-                    rot.rotateZ((float) Math.toRadians(18 + 6 * Math.sin(walked * 1.5)));
+                    px = WING_X; py = HIP_Y + WING_Y + bob;
+                    rot.rotateZ((float) Math.toRadians(10 + 7 * Math.sin(walked * 1.5)))
+                       .rotateY((float) Math.toRadians(-14));
                 }
                 default -> { }
             }
