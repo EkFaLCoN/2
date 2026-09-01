@@ -1,8 +1,11 @@
 # CursedValleyMobsAndMob — jar derleme
 #
 # Depoda .github/workflows/build.yml yolunda durmali.
-# pom.xml kokte OLMAK ZORUNDA DEGIL -- asagidaki adim onu kendisi bulur,
-# yani zip'i acarken dosyalar bir alt klasore girmis olsa da calisir.
+#
+# Kaynagi NASIL koydugun onemli degil:
+#   - dosyalari dogrudan push ettiysen         -> calisir
+#   - bir alt klasore koyduysan                -> calisir
+#   - ZIP'i acmadan attiysan                   -> zip'i kendisi acar
 name: Build
 
 on:
@@ -17,13 +20,24 @@ jobs:
       - name: Kaynagi al
         uses: actions/checkout@v4
 
+      # Kokte pom.xml yoksa, depodaki zip'leri acar.
+      - name: Zip varsa ac
+        run: |
+          if ! find . -name pom.xml -not -path "*/target/*" | grep -q .; then
+            echo "pom.xml yok, zip araniyor..."
+            for z in $(find . -name "*.zip" -not -path "./.git/*"); do
+              echo "aciliyor: $z"
+              unzip -q -o "$z" -d _kaynak
+            done
+          fi
+
       # pom.xml nerede? Bulup sonraki adimlara aktarir.
       - name: Proje klasorunu bul
         id: find
         run: |
           POM=$(find . -name pom.xml -not -path "*/target/*" | head -n1)
           if [ -z "$POM" ]; then
-            echo "pom.xml bulunamadi. Depodaki dosyalar:"
+            echo "::error::pom.xml hala bulunamadi. Depodaki dosyalar asagida."
             find . -maxdepth 3 -not -path "./.git/*" | head -50
             exit 1
           fi
@@ -38,7 +52,6 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
-          # Onbellek anahtari icin pom'un gercek yolu
           cache-dependency-path: ${{ steps.find.outputs.dir }}/pom.xml
 
       - name: Derle
