@@ -39,7 +39,9 @@ public final class OverlordModel {
     public static final String PART_TAG = "cv_ovl_part";
 
     /** Model 46 piksel yuksek; 4.0 olcekte ~11.5 blok (Giant ~12 blok). */
-    private static final float SCALE = 4.0f;
+    private static final float BOSS_SCALE = 4.0f;
+    /** Bu rigin olcegi. Bosslar 4.0, mini klonlar daha kucuk. */
+    private final float scale;
 
     /** Kemik adi + pivotun ayaktan yuksekligi (blok, olcek dahil). */
     private record Bone(String key, float x, float y, boolean limb) {}
@@ -111,7 +113,17 @@ public final class OverlordModel {
     private int overrideLeft;
 
     public OverlordModel(JavaPlugin plugin) {
+        this(plugin, BOSS_SCALE);
+    }
+
+    public OverlordModel(JavaPlugin plugin, float scale) {
         this.plugin = plugin;
+        this.scale = scale;
+    }
+
+    /** Olcek carpani: kemik ofsetleri BOSS_SCALE'e gore yazildi. */
+    private float k() {
+        return scale / BOSS_SCALE;
     }
 
     // ==================== YASAM DONGUSU ====================
@@ -166,6 +178,16 @@ public final class OverlordModel {
         armCur = armTarget = 0;
         armOverride = false;
         overrideLeft = 0;
+    }
+
+    /** Dalis gibi anlarda tum kemikleri gizler/gosterir. */
+    public void hide(boolean hidden) {
+        for (ItemDisplay d : parts.values()) {
+            if (d != null && !d.isDead()) d.setViewRange(hidden ? 0f : 3f);
+        }
+        if (nameTag != null && !nameTag.isDead()) {
+            nameTag.setViewRange(hidden ? 0f : 3f);
+        }
     }
 
     public void remove() {
@@ -418,10 +440,11 @@ public final class OverlordModel {
 
             d.setInterpolationDelay(0);
             d.setInterpolationDuration(2);
+            float kk = k();
             d.setTransformation(new Transformation(
-                    new Vector3f(px, py, pz),
+                    new Vector3f(px * kk, py * kk, pz * kk),
                     rot,
-                    new Vector3f(SCALE, SCALE, SCALE),
+                    new Vector3f(scale, scale, scale),
                     new Quaternionf()));
         }
     }

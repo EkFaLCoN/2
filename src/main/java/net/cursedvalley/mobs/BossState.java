@@ -2,6 +2,7 @@ package net.cursedvalley.mobs;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
@@ -24,6 +25,11 @@ public final class BossState {
     private final String label;
     private final double maxHealth;
     private double health;
+
+    /** Turuncu isaretlerin oldugu can yuzdeleri -- her biri bir kez tetiklenir. */
+    private static final double[] PHASES = {0.75, 0.50, 0.25};
+    private static final TextColor MARK = TextColor.color(0xFF8C1A);
+    private int phasesTaken = 0;
 
     public BossState(String label, double maxHealth) {
         this.label = label;
@@ -50,6 +56,26 @@ public final class BossState {
         health = Math.min(maxHealth, health + amount);
     }
 
+    /** Cani tamamen doldurur ve gecilmis esikleri sifirlar (yeniden tetiklensinler). */
+    public void healFull() {
+        health = maxHealth;
+        phasesTaken = 0;
+    }
+
+    /**
+     * Yeni bir turuncu esik gecildiyse yuzdesini doner (75, 50, 25), yoksa 0.
+     * Her esik yalnizca bir kez doner.
+     */
+    public int takePhase() {
+        if (maxHealth <= 0) return 0;
+        double ratio = health / maxHealth;
+        if (phasesTaken >= PHASES.length) return 0;
+        if (ratio > PHASES[phasesTaken]) return 0;
+        int pct = (int) Math.round(PHASES[phasesTaken] * 100);
+        phasesTaken++;
+        return pct;
+    }
+
     public Map<UUID, Double> attackers() {
         return attackers;
     }
@@ -60,18 +86,26 @@ public final class BossState {
         double ratio = maxHealth <= 0 ? 0 : health / maxHealth;
         int filled = (int) Math.round(ratio * slots);
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("|".repeat(Math.max(0, filled)));
-        String full = sb.toString();
-        String empty = "|".repeat(Math.max(0, slots - filled));
-
         NamedTextColor barColor = ratio > 0.5 ? NamedTextColor.GREEN
                 : ratio > 0.25 ? NamedTextColor.GOLD
                 : NamedTextColor.RED;
 
+        // Esik yuvalari: %75 -> 15. yuva, %50 -> 10, %25 -> 5.
+        boolean[] mark = new boolean[slots];
+        for (double ph : PHASES) {
+            int idx = (int) Math.round(ph * slots);
+            if (idx >= 0 && idx < slots) mark[idx] = true;
+        }
+
+        Component bar = Component.empty();
+        for (int i = 0; i < slots; i++) {
+            // Isaretler dolu ya da bos olsun her zaman turuncu gorunur.
+            bar = bar.append(Component.text("|",
+                    mark[i] ? MARK : (i < filled ? barColor : NamedTextColor.DARK_GRAY)));
+        }
+
         return Component.text(label + "  ", NamedTextColor.LIGHT_PURPLE)
-                .append(Component.text(full, barColor))
-                .append(Component.text(empty, NamedTextColor.DARK_GRAY))
+                .append(bar)
                 .append(Component.text("  " + format(health) + " / " + format(maxHealth),
                         NamedTextColor.WHITE));
     }

@@ -83,6 +83,37 @@ overlord:
       # Cember gorunduken kac tick sonra dussun (30 tick = 1.5 saniye)
       warn-ticks: 25
 
+    # ---- FAZ YETENEKLERI ----
+    # Can barinda %75 / %50 / %25'te turuncu isaretler vardir.
+    # Boss o esige indiginde ilgili yetenek BIR KEZ tetiklenir.
+    phase:
+
+      # %75 -- Gurz Firtinasi: yerinde doner, yakindakileri savurur.
+      # Uzaktakine dokunmaz; dibine yiginmayi cezalandirir.
+      storm:
+        radius: 8.0
+        damage: 18.0
+        knockback: 1.7
+
+      # %50 -- Yeraltina Dalis: gomulur, kaybolur, bir oyuncunun altindan
+      # patlayarak cikar. Patlama HARITAYA ZARAR VERMEZ (gercek explosion degil).
+      dive:
+        damage: 22.0
+        radius: 4.5
+
+      # %25 -- Mini klonlar. Her 10 saniyede ziplar, r=5 alanda geri iter.
+      # Droplari: /cvmobs drop add overlord_clone <oran>
+      clones:
+        count: 10
+        health: 5000
+        # Rig olcegi (boss 4.0). 1.6 ~ 4.6 blok boy.
+        scale: 1.6
+        # Overlord'unkinden zayif itis
+        knockback: 1.1
+
+  # Kimse gormezse boss kendini toparlar: bu kadar saniye sonra cani %100 olur.
+  unseen-reset-seconds: 30
+
 # ==================== GANIMET SANDIGI ====================
 # Odul yere esya olarak dokulmez; kazananin onune kutu gorunumlu bir kafa
 # duser. Sag tiklayinca envanteri acilir.
