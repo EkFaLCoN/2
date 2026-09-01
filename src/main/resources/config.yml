@@ -84,21 +84,31 @@ overlord:
       warn-ticks: 25
 
 # ==================== GANIMET SANDIGI ====================
-# Boss oldugunde odul yere esya olarak dokulmez; kazanan oyuncunun onune
-# kutu gorunumlu bir kafa duser. Sag tiklayinca envanteri acilir.
+# Odul yere esya olarak dokulmez; kazananin onune kutu gorunumlu bir kafa
+# duser. Sag tiklayinca envanteri acilir.
 #
-# Sandigi SADECE kazanan gorur -- diger oyunculardan gizlenir.
-# Sadece asagidaki "world" dunyasindaki BOSSLAR icin gecerlidir
-# (kristal ve overlord). Siradan yaratiklar eskisi gibi esya doker.
+# Sandigi SADECE kazanan gorur -- diger oyunculardan tamamen gizlenir.
+# Iki ayri stil var: bosslar icin ve siradan yaratiklar icin.
+# Ikisi de sadece asagidaki "world" dunyasinda calisir.
+#
+# texture: bir skin sitesindeki "value" (base64) alani. Icindeki hash
+#          TAM 64 karakter olmali; eksik kopyalarsan Steve kafasi cikar
+#          ve konsola uyari duser.
 loot-chest:
-  enabled: true
-  # Yerde kac saniye kalsin, sonra icindekilerle birlikte yok olsun
-  seconds: 30
-  # Sandigin ustunde ve envanterinde yazan baslik
-  title: "Ganimet Sandığı"
-  # Kafanin dokusu -- bir skin sitesindeki "value" (base64) alani.
-  # Bos birakirsan duz Steve kafasi cikar.
-  texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvMWI4ZmUxYzQ0YWNiZWViOTE4ZDM4YmM0MmQ1NTBiZWRkNWMzZGQwNDk4ODlmZDllZWVhMTE2MGFiOGI2YSJ9fX0="
+
+  # Lanetli Kristal ve Overlord
+  boss:
+    enabled: true
+    seconds: 30
+    title: "Ganimet Sandığı"
+    texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvOWM5NmJlNzg4NmViN2RmNzU1MjVhMzYzZTVmNTQ5NjI2YzIxMzg4ZjBmZGE5ODhhNmU4YmY0ODdhNTMifX19"
+
+  # Cursed Valley'de olen diger tum yaratiklar
+  mob:
+    enabled: true
+    seconds: 30
+    title: "Ganimet Kutusu"
+    texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZjYyNGM5MjdjZmVhMzEzNTU0Mjc5OTNkOGI3OTcxMmU4NmY5NGQ1OTUzNDMzZjg0ODg0OWEzOWE2ODc5In19fQ=="
 
 
 # Droplar komutla eklenir, elle duzenlemene gerek yok:

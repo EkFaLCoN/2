@@ -38,7 +38,9 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 
@@ -63,21 +65,27 @@ public final class LootChest implements Listener {
     private final JavaPlugin plugin;
     private final List<Chest> open = new ArrayList<>();
 
-    /** Kafanin dokusu (base64 "value"). config.yml'den okunur. */
-    private String textureValue;
-    /** Sandigin yerde kalma suresi (saniye). */
-    private int lifeSeconds = 30;
-    /** Ustunde yazan baslik. */
-    private String title = "Ganimet Sandığı";
+    /**
+     * Bir sandik turu: kendi kafa dokusu, basligi ve suresi.
+     * Boss ve siradan yaratik icin iki ayri stil var.
+     */
+    public record Style(String texture, String title, int seconds) {
+        public Style {
+            if (title == null || title.isBlank()) title = "Ganimet Sandığı";
+            seconds = Math.max(1, seconds);
+        }
+    }
+
+    /** Kafa esyalari stile gore bir kez uretilip saklanir. */
+    private final Map<String, ItemStack> headCache = new HashMap<>();
 
     public LootChest(JavaPlugin plugin) {
         this.plugin = plugin;
     }
 
-    public void configure(String textureValue, int lifeSeconds, String title) {
-        this.textureValue = textureValue;
-        this.lifeSeconds = Math.max(1, lifeSeconds);
-        if (title != null && !title.isBlank()) this.title = title;
+    /** Ayarlar yeniden yuklendiginde kafa onbellegini bosalt. */
+    public void resetCache() {
+        headCache.clear();
     }
 
     // ==================== SANDIK ====================
@@ -91,20 +99,22 @@ public final class LootChest implements Listener {
         final Inventory inv;
         int ticksLeft;
         final float yaw;
+        final String label0;
         double bobPhase;
         boolean closed;
 
         Chest(UUID owner, ItemDisplay head, TextDisplay label, Interaction hitbox,
-              List<ItemStack> loot, int ticks, float yaw) {
+              List<ItemStack> loot, int ticks, float yaw, String label0) {
             this.owner = owner;
             this.yaw = yaw;
+            this.label0 = label0;
             this.head = head;
             this.label = label;
             this.hitbox = hitbox;
             this.ticksLeft = ticks;
             int rows = Math.max(1, Math.min(6, (loot.size() + 8) / 9));
             this.inv = Bukkit.createInventory(this, rows * 9,
-                    Component.text(title, NamedTextColor.GOLD, TextDecoration.BOLD));
+                    Component.text(label0, NamedTextColor.GOLD, TextDecoration.BOLD));
             for (ItemStack it : loot) inv.addItem(it.clone());
         }
 
@@ -137,18 +147,18 @@ public final class LootChest implements Listener {
      * @return sandik kurulduysa true; kurulamadiysa (oyuncu cevrimdisi vb.) false,
      *         bu durumda cagiran taraf esyalari eskisi gibi yere dokmeli.
      */
-    public boolean drop(Location at, Player winner, List<ItemStack> loot, float bossYaw) {
+    public boolean drop(Location at, Player winner, List<ItemStack> loot, float bossYaw, Style style) {
         if (winner == null || !winner.isOnline() || loot.isEmpty()) return false;
 
         World w = at.getWorld();
         if (w == null) return false;
-        Location base = at.clone();
+        Location base = spread(at.clone());
         base.setPitch(0f);
         base.setYaw(bossYaw);
         // Modelin yerel +Z'si ileriyi gosterir; Minecraft yaw'i saat yonunun tersi.
         final float rotY = (float) Math.toRadians(-bossYaw);
 
-        ItemStack skull = headItem();
+        ItemStack skull = headItem(style.texture());
 
         ItemDisplay head = w.spawn(base.clone().add(0, 0.35, 0), ItemDisplay.class, e -> {
             e.setItemStack(skull);
@@ -171,7 +181,7 @@ public final class LootChest implements Listener {
             e.setViewRange(4.0f);
             e.setBrightness(new Display.Brightness(15, 15));
             e.addScoreboardTag(TAG);
-            e.text(Component.text(title, NamedTextColor.GOLD)
+            e.text(Component.text(style.title(), NamedTextColor.GOLD)
                     .decorate(TextDecoration.BOLD, TextDecoration.UNDERLINED));
         });
 
@@ -183,7 +193,7 @@ public final class LootChest implements Listener {
             e.addScoreboardTag(TAG);
         });
 
-        Chest c = new Chest(winner.getUniqueId(), head, label, hitbox, loot, lifeSeconds * 20, rotY);
+        Chest c = new Chest(winner.getUniqueId(), head, label, hitbox, loot, style.seconds() * 20, rotY, style.title());
         open.add(c);
 
         // Kazanan disindaki herkesten gizle.
@@ -193,6 +203,29 @@ public final class LootChest implements Listener {
 
         w.playSound(base, Sound.BLOCK_ENDER_CHEST_OPEN, SoundCategory.PLAYERS, 0.9f, 1.4f);
         return true;
+    }
+
+    /**
+     * Iki yaratik ayni anda olurse sandiklar ust uste binmesin diye
+     * dolu noktalari kucuk bir spiralle kaydirir.
+     */
+    private Location spread(Location want) {
+        for (int i = 0; i < 12; i++) {
+            boolean clash = false;
+            for (Chest c : open) {
+                if (c.head == null || c.head.isDead()) continue;
+                Location o = c.head.getLocation();
+                if (o.getWorld() == want.getWorld() && o.distanceSquared(want) < 1.44) {
+                    clash = true;
+                    break;
+                }
+            }
+            if (!clash) return want;
+            double a = i * (Math.PI / 3);
+            double r = 1.3 + (i / 6) * 0.9;
+            want.add(Math.cos(a) * r, 0, Math.sin(a) * r);
+        }
+        return want;
     }
 
     private void hideFrom(Player p, Chest c) {
@@ -210,16 +243,26 @@ public final class LootChest implements Listener {
         }
     }
 
-    private ItemStack headItem() {
+    private ItemStack headItem(String textureValue) {
+        String key = textureValue == null ? "" : textureValue;
+        ItemStack cached = headCache.get(key);
+        if (cached != null) return cached.clone();
+
         ItemStack it = new ItemStack(Material.PLAYER_HEAD);
-        if (textureValue == null || textureValue.isBlank()) return it;
+        if (key.isBlank()) { headCache.put(key, it); return it.clone(); }
         try {
             String json = new String(Base64.getDecoder().decode(textureValue), StandardCharsets.UTF_8);
             int i = json.indexOf("\"url\"");
             if (i < 0) return it;
             int a = json.indexOf('"', json.indexOf(':', i) + 1);
             int b = json.indexOf('"', a + 1);
-            URL url = URI.create(json.substring(a + 1, b)).toURL();
+            String raw = json.substring(a + 1, b);
+            String hash = raw.substring(raw.lastIndexOf('/') + 1);
+            if (hash.length() != 64) {
+                plugin.getLogger().warning("Kafa dokusunun hash'i " + hash.length()
+                        + " karakter, 64 olmalı — eksik kopyalanmış. Steve kafası çıkacak.");
+            }
+            URL url = URI.create(raw).toURL();
 
             PlayerProfile profile = Bukkit.createPlayerProfile(UUID.randomUUID(), "cvloot");
             PlayerTextures tex = profile.getTextures();
@@ -232,7 +275,8 @@ public final class LootChest implements Listener {
         } catch (Exception ex) {
             plugin.getLogger().warning("Ganimet sandığının dokusu okunamadı: " + ex.getMessage());
         }
-        return it;
+        headCache.put(key, it);
+        return it.clone();
     }
 
     // ==================== ETKILESIM ====================
@@ -336,7 +380,7 @@ public final class LootChest implements Listener {
             // Son 5 saniyede sayac gorunur.
             int sec = c.ticksLeft / 20;
             if (c.label != null && !c.label.isDead()) {
-                Component base = Component.text(title, NamedTextColor.GOLD)
+                Component base = Component.text(c.label0, NamedTextColor.GOLD)
                         .decorate(TextDecoration.BOLD, TextDecoration.UNDERLINED);
                 c.label.text(sec <= 5
                         ? base.append(Component.text("  " + sec + "s", NamedTextColor.RED))

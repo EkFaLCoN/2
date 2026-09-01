@@ -28,6 +28,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -82,11 +83,11 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
     private final DropRegistry drops = new DropRegistry();
     private final LootChest lootChest = new LootChest(this);
 
-    /** Ganimet sandigi ayarlari. */
+    /** Ganimet sandigi ayarlari: boss ve siradan yaratik icin ayri stil. */
     private boolean lootChestEnabled;
-    private int lootChestSeconds;
-    private String lootChestTitle;
-    private String lootChestTexture;
+    private boolean mobChestEnabled;
+    private LootChest.Style bossChestStyle;
+    private LootChest.Style mobChestStyle;
 
     /** Overlord'un ozel modeli (item_display kemikleri). */
     private final OverlordModel model = new OverlordModel(this);
@@ -126,7 +127,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
      * Yeni bir ayar eklendiginde ya da bir varsayilan degistiginde sunucuda eski
      * deger okunmaya devam ediyordu (meteor sayisinin 11'de kalmasi bu yuzdendi).
      */
-    private static final int CONFIG_VERSION = 5;
+    private static final int CONFIG_VERSION = 6;
 
     // ==================== ACILIS ====================
 
@@ -199,11 +200,18 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         reloadConfig();
         var c = getConfig();
         worldName      = c.getString("world", "cursedvalley");
-        lootChestEnabled = c.getBoolean("loot-chest.enabled", true);
-        lootChestSeconds = c.getInt("loot-chest.seconds", 30);
-        lootChestTitle   = c.getString("loot-chest.title", "Ganimet Sandığı");
-        lootChestTexture = c.getString("loot-chest.texture", "");
-        lootChest.configure(lootChestTexture, lootChestSeconds, lootChestTitle);
+        lootChestEnabled = c.getBoolean("loot-chest.boss.enabled", true);
+        bossChestStyle = new LootChest.Style(
+                c.getString("loot-chest.boss.texture", ""),
+                c.getString("loot-chest.boss.title", "Ganimet Sandığı"),
+                c.getInt("loot-chest.boss.seconds", 30));
+
+        mobChestEnabled = c.getBoolean("loot-chest.mob.enabled", true);
+        mobChestStyle = new LootChest.Style(
+                c.getString("loot-chest.mob.texture", ""),
+                c.getString("loot-chest.mob.title", "Ganimet Kutusu"),
+                c.getInt("loot-chest.mob.seconds", 30));
+        lootChest.resetCache();
         crystalX       = c.getInt("crystal.x", 0);
         crystalY       = c.getInt("crystal.y", -47);
         crystalZ       = c.getInt("crystal.z", 0);
@@ -1055,6 +1063,40 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         }
     }
 
+    /**
+     * Cursed Valley'de olen HER yaratik icin sandik.
+     *
+     * Yaratigin normal droplari (vanilla + varsa /cvmobs kayitlari) yere
+     * dokulmez, oldurenin onundeki kutuya girer. Tecrube normal akar.
+     * Bosslar buraya girmez -- onlarin kendi olum akisi var.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onMobDeath(EntityDeathEvent event) {
+        if (!mobChestEnabled) return;
+
+        LivingEntity dead = event.getEntity();
+        if (dead instanceof Player) return;
+        if (dead.getScoreboardTags().contains(TAG)) return;          // boss / boss parcasi
+        if (overlord != null && BossState.same(dead, overlord)) return;
+        if (!dead.getWorld().getName().equalsIgnoreCase(worldName)) return;
+
+        Player killer = dead.getKiller();
+        if (killer == null || !killer.isOnline()) return;
+
+        List<ItemStack> loot = new ArrayList<>();
+        for (ItemStack it : event.getDrops()) {
+            if (it != null && !it.getType().isAir()) loot.add(it.clone());
+        }
+        // Bu yaratik icin ayrica kayitli drop varsa onlar da kutuya girer.
+        loot.addAll(drops.roll(dead.getType().name()));
+        if (loot.isEmpty()) return;
+
+        Location at = dead.getLocation().clone().add(0, 1, 0);
+        if (lootChest.drop(at, killer, loot, dead.getLocation().getYaw(), mobChestStyle)) {
+            event.getDrops().clear();   // yere hicbir sey dokulmesin
+        }
+    }
+
     // ==================== DROP ====================
 
     private void giveDrops(String mob, List<UUID> hitters, Location loc, String bossName) {
@@ -1081,7 +1123,8 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
                 && loc.getWorld().getName().equalsIgnoreCase(worldName);
 
         if (lootChestEnabled && isBoss && inValley
-                && lootChest.drop(loc.clone().add(0, 1, 0), chosen, won, chestYaw(loc, chosen))) {
+                && lootChest.drop(loc.clone().add(0, 1, 0), chosen, won,
+                        chestYaw(loc, chosen), bossChestStyle)) {
             Bukkit.broadcast(Component.text(bossName + " > ", NamedTextColor.DARK_RED)
                     .append(Component.text(who, NamedTextColor.YELLOW))
                     .append(Component.text(" ganimet sandığını kazandı!", NamedTextColor.WHITE)));
