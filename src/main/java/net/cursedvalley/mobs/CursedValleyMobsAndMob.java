@@ -142,7 +142,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
      * Yeni bir ayar eklendiginde ya da bir varsayilan degistiginde sunucuda eski
      * deger okunmaya devam ediyordu (meteor sayisinin 11'de kalmasi bu yuzdendi).
      */
-    private static final int CONFIG_VERSION = 8;
+    private static final int CONFIG_VERSION = 10;
 
     // ==================== ACILIS ====================
 
@@ -218,16 +218,18 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         var c = getConfig();
         worldName      = c.getString("world", "cursedvalley");
         cloneCount     = c.getInt("overlord.ability.phase.clones.count", 10);
-        cloneHealth    = c.getDouble("overlord.ability.phase.clones.health", 5000);
+        cloneHealth    = c.getDouble("overlord.ability.phase.clones.health", 500);
         cloneScale     = c.getDouble("overlord.ability.phase.clones.scale", 1.6);
         cloneKnockback = c.getDouble("overlord.ability.phase.clones.knockback", 1.1);
         clones.setKnockback(cloneKnockback);
         clones.setMelee(
-                c.getDouble("overlord.ability.phase.clones.melee-damage", 10.0),
+                c.getDouble("overlord.ability.phase.clones.melee-damage", 5.0),
                 c.getDouble("overlord.melee-reach", 4.0),
                 Math.max(5, c.getInt("overlord.melee-cooldown-ticks", 20)));
         // Ziplama darbesi Overlord'un yere cakilmasiyla ayni hasari verir.
         clones.setJumpDamage(c.getDouble("overlord.ability.damage", 26));
+        clones.setSight(c.getDouble("overlord.ability.phase.clones.sight-range", 7.0));
+        clones.setSpeed(c.getDouble("overlord.ability.phase.clones.speed", 0.75));
 
         stormRadius    = c.getDouble("overlord.ability.phase.storm.radius", 8.0);
         stormDamage    = c.getDouble("overlord.ability.phase.storm.damage", 18.0);
@@ -563,12 +565,15 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         Bukkit.broadcast(Component.text("Overlord gürzünü iki eline aldı!", NamedTextColor.GOLD));
         w.playSound(center, Sound.ENTITY_WARDEN_SONIC_CHARGE, SoundCategory.HOSTILE, 2.0f, 0.7f);
 
+        final int raiseTicks = 25;           // kollari kaldirma suresi
         final int spinTicks = 5 * 14;        // 5 tur, tur basina 14 tick
         final int staggerTicks = 40;         // 2 saniye sersemleme
 
         // Firtina + sersemleme boyunca diger yetenekler ve melee kapali.
         stormLock = true;
-        if (customModel) model.playStorm(spinTicks);
+        // Kaldirma suresi ile asagidaki gecikme AYNI olmali; yoksa model
+        // vuruslardan once donmeye baslar.
+        if (customModel) model.playStorm(raiseTicks, spinTicks);
 
         new org.bukkit.scheduler.BukkitRunnable() {
             int t = 0;
@@ -622,7 +627,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
 
                 t++;
             }
-        }.runTaskTimer(this, 25L, 1L);
+        }.runTaskTimer(this, raiseTicks, 1L);
     }
 
     /**
@@ -716,6 +721,10 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
     /** %25: mini klonlar. */
     private void summonClones() {
         Bukkit.broadcast(Component.text("Overlord kendi suretlerini çağırdı!", NamedTextColor.DARK_RED));
+        // Klonlar Overlord ile ayni yuvaya ve ayni tasma yaricapina bagli:
+        // oyuncular onlari bowlun disina cekemez.
+        World w = overlord.getWorld();
+        clones.setLeash(new Location(w, crystalX + 0.5, crystalY, crystalZ + 0.5), leashRadius);
         clones.spawn(overlord.getLocation(), cloneCount, cloneHealth, (float) cloneScale, customModel);
     }
 

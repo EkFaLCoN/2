@@ -176,12 +176,22 @@ public final class CloneSquad {
             // Vanilla can barini hep dolu tut; gercek can bizde.
             if (c.entity.getHealth() < 1024.0) c.entity.setHealth(1024.0);
 
+            // Yuvadan cok uzaklastiysa hedefi birakip geri doner.
+            // Boylece oyuncular klonlari bowlun disina cekemez.
+            if (home != null && c.entity.getWorld().equals(home.getWorld())
+                    && c.entity.getLocation().distance(home) > leashRadius) {
+                c.entity.setTarget(null);
+                c.entity.getPathfinder().moveTo(home, speed);
+                if (--c.jumpTimer <= 0) c.jumpTimer = 200;
+                continue;
+            }
+
             // Giant'in vanilla AI'si yok -- hedefi elle takip eder.
             Player near = nearest(c.entity.getLocation());
             if (near != null) {
                 c.entity.setTarget(near);
                 if (near.getLocation().distance(c.entity.getLocation()) > 2.5) {
-                    c.entity.getPathfinder().moveTo(near, 1.1);
+                    c.entity.getPathfinder().moveTo(near, speed);
                 }
 
                 // Yakin dovus
@@ -194,6 +204,8 @@ public final class CloneSquad {
                             Sound.ENTITY_PLAYER_ATTACK_STRONG, SoundCategory.HOSTILE, 1.0f, 0.8f);
                     hurt(c.entity, near, meleeDamage);
                 }
+            } else {
+                c.entity.setTarget(null);
             }
 
             if (--c.jumpTimer <= 0) {
@@ -216,7 +228,7 @@ public final class CloneSquad {
             if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue;
             if (p.getGameMode() == org.bukkit.GameMode.CREATIVE) continue;
             double d = p.getLocation().distanceSquared(at);
-            if (d < bestD && d < 40 * 40) { bestD = d; best = p; }
+            if (d < bestD && d < sightRange * sightRange) { bestD = d; best = p; }
         }
         return best;
     }
@@ -264,6 +276,13 @@ public final class CloneSquad {
     private int meleeCooldown = 20;
     /** Ziplama darbesi -- Overlord'un yere cakilmasiyla ayni. */
     private double jumpDamage = 26.0;
+    /** Gorus mesafesi: bu kadar uzaktaki oyuncuyu fark eder. */
+    private double sightRange = 7.0;
+    /** Yuva merkezi ve yaricapi -- bunun disina cikamazlar. */
+    private Location home;
+    private double leashRadius = 50.0;
+    /** Yurume hizi carpani (Overlord'dan yavas). */
+    private double speed = 0.75;
 
     public void setKnockback(double v)   { this.knockback = v; }
     public void setMelee(double dmg, double reach, int cooldownTicks) {
@@ -272,6 +291,12 @@ public final class CloneSquad {
         this.meleeCooldown = Math.max(1, cooldownTicks);
     }
     public void setJumpDamage(double v)  { this.jumpDamage = v; }
+    public void setSight(double v)       { this.sightRange = Math.max(1.0, v); }
+    public void setSpeed(double v)       { this.speed = Math.max(0.1, v); }
+    public void setLeash(Location home, double radius) {
+        this.home = home == null ? null : home.clone();
+        this.leashRadius = Math.max(5.0, radius);
+    }
 
     /**
      * Klonun oyuncuya verdigi hasar. Bossla ayni mantik: MAGIC turu zirhi

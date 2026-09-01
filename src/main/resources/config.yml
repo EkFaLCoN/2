@@ -105,9 +105,13 @@ overlord:
       # Droplari: /cvmobs drop add overlord_clone <oran>
       clones:
         count: 10
-        health: 5000
+        health: 500
         # Yakin dovus hasari
-        melee-damage: 10.0
+        melee-damage: 5.0
+        # Bu kadar uzaktaki oyuncuyu fark eder (Overlord'unki cok daha genis)
+        sight-range: 7.0
+        # Yurume hizi carpani -- Overlord 1.0, klonlar daha yavas
+        speed: 0.75
         # Ziplama darbesi ayrica ayarlanmaz -- overlord.ability.damage ile ayni
         # Rig olcegi (boss 4.0). 1.6 ~ 4.6 blok boy.
         scale: 1.6

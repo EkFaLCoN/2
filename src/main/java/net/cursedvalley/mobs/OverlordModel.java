@@ -112,9 +112,11 @@ public final class OverlordModel {
     private boolean armOverride;
     private int overrideLeft;
 
-    /** Gurz Firtinasi: iki elle tutup donme. */
+    /** Gurz Firtinasi: once kollari kaldirma, sonra donme. */
+    private int stormRaise;
     private int stormLeft;
     private double stormSpin;
+    private float stormArmCur;
     /** Firtina sonrasi sarsilma. */
     private int staggerLeft;
 
@@ -265,8 +267,10 @@ public final class OverlordModel {
      * Gurz Firtinasi duruşu: gurz IKI ELLE tutulur (iki kol da one uzanir,
      * gurz ellerin arasinda ortada durur) ve boss kendi ekseninde doner.
      */
-    public void playStorm(int ticks) {
-        stormLeft = Math.max(1, ticks);
+    public void playStorm(int raiseTicks, int spinTicks) {
+        stormRaise = Math.max(1, raiseTicks);
+        stormLeft = Math.max(1, spinTicks);
+        stormSpin = 0;
         maceActive = false;
         maceCur = 0f;
         atkTick = -1;
@@ -345,12 +349,17 @@ public final class OverlordModel {
         // --- Gurz Firtinasi ---
         boolean twoHanded = false;
         float spinDeg = 0f;
-        if (stormLeft > 0) {
-            stormLeft--;
+        if (stormRaise > 0 || stormLeft > 0) {
             twoHanded = true;
-            stormSpin += 26.0;              // tur basina ~14 tick
+            if (stormRaise > 0) {
+                // Once kollar yukari kalkar, boss henuz donmez.
+                stormRaise--;
+            } else {
+                stormLeft--;
+                stormSpin += 26.0;          // tur basina ~14 tick
+                if (stormLeft == 0) { stormSpin = 0; stormArmCur = 0f; }
+            }
             spinDeg = (float) stormSpin;
-            if (stormLeft == 0) stormSpin = 0;
         }
 
         // --- sarsilma ---
@@ -368,8 +377,11 @@ public final class OverlordModel {
 
         // Iki elle tutus: her iki kol da one uzanir, gurz ortada kalir.
         if (twoHanded) {
-            armR = (float) Math.toRadians(-92);
-            armL = (float) Math.toRadians(-92);
+            // Gurz basin uzerine dogru kalkar, sonra o duruşta donulur.
+            float target = (float) Math.toRadians(-148);
+            stormArmCur += (target - stormArmCur) * 0.22f;
+            armR = stormArmCur;
+            armL = stormArmCur;
         }
 
         // dizlerin bukulmesi (yer sarsma)
