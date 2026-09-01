@@ -710,13 +710,13 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
             Player target = grounded.isEmpty() ? pickTarget()
                     : grounded.get(ThreadLocalRandom.current().nextInt(grounded.size()));
 
-            Location out = (target != null ? target.getLocation() : start).clone();
+            Location anchor = (target != null ? target.getLocation() : start).clone();
             // Tam ustunde degil, YANINDA cikar -- oyuncu sikismasin.
             double ang = ThreadLocalRandom.current().nextDouble() * Math.PI * 2;
-            out.add(Math.cos(ang) * 3.0, 0, Math.sin(ang) * 3.0);
+            anchor.add(Math.cos(ang) * 3.0, 0, Math.sin(ang) * 3.0);
             // Hedefin kendi yuksekligine gore zemin ara -- yuzey degil.
-            double refY = (target != null ? target.getLocation() : start).getY();
-            out = Ground.findNear(out, refY);
+            // Ic lambda bunu yakaladigi icin bir daha ATANMAMALI (effectively final).
+            final Location out = Ground.findNear(anchor, anchor.getY());
 
             // Cikmadan once zemin titresir -- kacacak zaman kalsin.
             World world = out.getWorld();
