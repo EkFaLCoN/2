@@ -1560,14 +1560,22 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
                             NamedTextColor.RED));
                     return true;
                 }
-                if (args.length > 1 && args[1].equalsIgnoreCase("remove")) {
-                    dragon.remove();
-                    sender.sendMessage(Component.text("Lizard Dragon kaldırıldı.",
-                            NamedTextColor.GREEN));
-                } else {
-                    dragon.spawn(w);
-                    sender.sendMessage(Component.text("Lizard Dragon çağrıldı.",
-                            NamedTextColor.GREEN));
+                try {
+                    if (args.length > 1 && args[1].equalsIgnoreCase("remove")) {
+                        dragon.remove();
+                        sender.sendMessage(Component.text("Lizard Dragon kaldırıldı.",
+                                NamedTextColor.GREEN));
+                    } else {
+                        dragon.spawn(w);
+                        sender.sendMessage(Component.text("Lizard Dragon çağrıldı.",
+                                NamedTextColor.GREEN));
+                    }
+                } catch (Exception ex) {
+                    // "An unexpected error occurred" yerine gercek sebebi goster.
+                    sender.sendMessage(Component.text("Ejder çağrılamadı: " + ex,
+                            NamedTextColor.RED));
+                    getLogger().severe("Ejder çağrılamadı:");
+                    ex.printStackTrace();
                 }
             }
 

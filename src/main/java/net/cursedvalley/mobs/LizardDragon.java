@@ -120,16 +120,32 @@ public final class LizardDragon {
         // Arena yeraltinda; yuzey degil, arena zemini referans alinir.
         at = Ground.hoverNear(at, arenaY, hoverHeight);
 
-        dragon = w.spawn(at, EnderDragon.class, d -> {
-            d.addScoreboardTag(TAG);
-            d.setPersistent(true);
-            d.setPhase(EnderDragon.Phase.CIRCLING);
-            // Vanilla can barini kendimiz yonetecegiz.
-            var mx = d.getAttribute(Attribute.MAX_HEALTH);
+        // Dogum sirasinda SADECE etiket verilir.
+        // getBossBar() ve setPhase() varlik dunyaya EKLENDIKTEN sonra calisir;
+        // spawn geri cagriminda cagrilirsa istisna firlatir.
+        dragon = w.spawn(at, EnderDragon.class, d -> d.addScoreboardTag(TAG));
+
+        try {
+            dragon.setPersistent(true);
+            // HOVER, portal/end savasi gerektirmez -- overworld icin guvenli faz.
+            dragon.setPhase(EnderDragon.Phase.HOVER);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Ejder fazı ayarlanamadı: " + ex.getMessage());
+        }
+
+        try {
+            var mx = dragon.getAttribute(Attribute.MAX_HEALTH);
             if (mx != null) mx.setBaseValue(1024.0);
-            d.setHealth(1024.0);
-            d.getBossBar().setVisible(false);
-        });
+            dragon.setHealth(1024.0);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Ejder canı ayarlanamadı: " + ex.getMessage());
+        }
+
+        try {
+            if (dragon.getBossBar() != null) dragon.getBossBar().setVisible(false);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Vanilla ejder barı gizlenemedi: " + ex.getMessage());
+        }
 
         state = new BossState("LIZARD DRAGON", maxHealth, true);
         enraged = false;
