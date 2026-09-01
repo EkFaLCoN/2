@@ -98,15 +98,14 @@ public final class LootChest implements Listener {
         final Interaction hitbox;
         final Inventory inv;
         int ticksLeft;
-        final float yaw;
+        float yaw;
         final String label0;
         double bobPhase;
         boolean closed;
 
         Chest(UUID owner, ItemDisplay head, TextDisplay label, Interaction hitbox,
-              List<ItemStack> loot, int ticks, float yaw, String label0) {
+              List<ItemStack> loot, int ticks, String label0) {
             this.owner = owner;
-            this.yaw = yaw;
             this.label0 = label0;
             this.head = head;
             this.label = label;
@@ -147,16 +146,14 @@ public final class LootChest implements Listener {
      * @return sandik kurulduysa true; kurulamadiysa (oyuncu cevrimdisi vb.) false,
      *         bu durumda cagiran taraf esyalari eskisi gibi yere dokmeli.
      */
-    public boolean drop(Location at, Player winner, List<ItemStack> loot, float bossYaw, Style style) {
+    public boolean drop(Location at, Player winner, List<ItemStack> loot, Style style) {
         if (winner == null || !winner.isOnline() || loot.isEmpty()) return false;
 
         World w = at.getWorld();
         if (w == null) return false;
         Location base = spread(at.clone());
         base.setPitch(0f);
-        base.setYaw(bossYaw);
-        // Modelin yerel +Z'si ileriyi gosterir; Minecraft yaw'i saat yonunun tersi.
-        final float rotY = (float) Math.toRadians(-bossYaw);
+        base.setYaw(0f);
 
         ItemStack skull = headItem(style.texture());
 
@@ -170,7 +167,7 @@ public final class LootChest implements Listener {
             e.setInterpolationDuration(20);
             e.addScoreboardTag(TAG);
             e.setTransformation(new Transformation(
-                    new Vector3f(0f, 0f, 0f), new Quaternionf().rotateY(rotY),
+                    new Vector3f(0f, 0f, 0f), new Quaternionf(),
                     new Vector3f(1.1f, 1.1f, 1.1f), new Quaternionf()));
         });
 
@@ -193,7 +190,7 @@ public final class LootChest implements Listener {
             e.addScoreboardTag(TAG);
         });
 
-        Chest c = new Chest(winner.getUniqueId(), head, label, hitbox, loot, style.seconds() * 20, rotY, style.title());
+        Chest c = new Chest(winner.getUniqueId(), head, label, hitbox, loot, style.seconds() * 20, style.title());
         open.add(c);
 
         // Kazanan disindaki herkesten gizle.
@@ -366,7 +363,25 @@ public final class LootChest implements Listener {
                 continue;
             }
 
-            // Donmez -- bossun oldugu yone sabit bakar. Sadece hafifce salinir.
+            // Yuzunu her zaman sahibine donsun. Kafa modelinin yuzu yerel -Z'ye
+            // bakar, bu yuzden hedef yon icin atan2(-dx, -dz) kullaniliyor.
+            Player owner = Bukkit.getPlayer(c.owner);
+            if (owner != null && owner.isOnline()
+                    && owner.getWorld().equals(c.head.getWorld())) {
+                Location o = owner.getEyeLocation();
+                Location h = c.head.getLocation();
+                double dx = o.getX() - h.getX();
+                double dz = o.getZ() - h.getZ();
+                if (dx != 0 || dz != 0) {
+                    float want = (float) Math.atan2(-dx, -dz);
+                    // En kisa yoldan yumusakca don, ani ziplama olmasin.
+                    float diff = want - c.yaw;
+                    while (diff >  Math.PI) diff -= (float) (2 * Math.PI);
+                    while (diff < -Math.PI) diff += (float) (2 * Math.PI);
+                    c.yaw += diff * 0.35f;
+                }
+            }
+
             c.bobPhase += 0.07;
             float y = (float) (Math.sin(c.bobPhase) * 0.05);
             c.head.setInterpolationDelay(0);

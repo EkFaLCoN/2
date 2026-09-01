@@ -46,8 +46,11 @@ public final class OverlordModel {
 
     /** Bel yuksekligi (bacak boyu). Govde ve bacaklar buradan baslar. */
     private static final float WAIST_Y = 4.5f;
-    /** Belden omuza / boyuna mesafe (govde boyu). */
+    /** Belden omuza mesafe (govde boyu). */
     private static final float TORSO_LEN = 4.0f;
+    /** Belden kafanin altina mesafe. Govde ustunde bir boyun payi vardir,
+     *  yoksa kafa dogrudan govdeye yapisik gorunur. */
+    private static final float NECK_LEN = 4.65f;
     /** Omuzdan ele mesafe (kol boyu). */
     private static final float ARM_LEN = 4.0f;
     /** Omuz ve kalca yanal ofsetleri. */
@@ -363,10 +366,10 @@ public final class OverlordModel {
         float cosL  = (float) Math.cos(leanCur);
         float sinL  = (float) Math.sin(leanCur);
 
-        float neckY     = waist + TORSO_LEN * cosL;
-        float neckZ     =         TORSO_LEN * sinL;
-        float shoulderY = neckY;
-        float shoulderZ = neckZ;
+        float neckY     = waist + NECK_LEN * cosL;
+        float neckZ     =         NECK_LEN * sinL;
+        float shoulderY = waist + TORSO_LEN * cosL;
+        float shoulderZ =         TORSO_LEN * sinL;
 
         // el = omuz + omuzdan asagi sarkan kolun ucu (once X, sonra Y donusu)
         float th   = leanCur + armL;

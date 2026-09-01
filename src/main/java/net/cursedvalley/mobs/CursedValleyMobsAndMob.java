@@ -1092,7 +1092,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         if (loot.isEmpty()) return;
 
         Location at = dead.getLocation().clone().add(0, 1, 0);
-        if (lootChest.drop(at, killer, loot, dead.getLocation().getYaw(), mobChestStyle)) {
+        if (lootChest.drop(at, killer, loot, mobChestStyle)) {
             event.getDrops().clear();   // yere hicbir sey dokulmesin
         }
     }
@@ -1123,8 +1123,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
                 && loc.getWorld().getName().equalsIgnoreCase(worldName);
 
         if (lootChestEnabled && isBoss && inValley
-                && lootChest.drop(loc.clone().add(0, 1, 0), chosen, won,
-                        chestYaw(loc, chosen), bossChestStyle)) {
+                && lootChest.drop(loc.clone().add(0, 1, 0), chosen, won, bossChestStyle)) {
             Bukkit.broadcast(Component.text(bossName + " > ", NamedTextColor.DARK_RED)
                     .append(Component.text(who, NamedTextColor.YELLOW))
                     .append(Component.text(" ganimet sandığını kazandı!", NamedTextColor.WHITE)));
@@ -1163,21 +1162,6 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
      * Ruby esyalari item_name kullaniyor; sadece displayName'e bakildigi icin
      * "Ruby Balta" yerine "Netherite Balta" yaziliyordu. Ikisi de yoksa tur adi.
      */
-    /**
-     * Sandigin bakacagi yon. Boss bir yaratiksa oldugu andaki yonu kullanilir.
-     * Kristalin yaw'i her zaman 0 oldugu icin onun yerine kazanan oyuncuya doner.
-     */
-    private float chestYaw(Location loc, Player chosen) {
-        float yaw = loc.getYaw();
-        if (yaw != 0f) return yaw;
-        if (chosen == null || !chosen.isOnline()) return 0f;
-        Location p = chosen.getLocation();
-        double dx = p.getX() - loc.getX();
-        double dz = p.getZ() - loc.getZ();
-        if (dx == 0 && dz == 0) return 0f;
-        return (float) Math.toDegrees(Math.atan2(-dx, dz));
-    }
-
     private Component itemName(ItemStack stack) {
         var meta = stack.getItemMeta();
         if (meta != null) {
