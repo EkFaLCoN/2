@@ -1707,6 +1707,10 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         sender.sendMessage(Component.text("/cvmobs drop remove <yaratık> <sıra>", NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/cvmobs drop clear <yaratık>", NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/cvmobs spawn   |   /cvmobs reload   |   /cvmobs info", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("Yaratık adları: crystal, overlord", NamedTextColor.DARK_GRAY));
+        sender.sendMessage(Component.text("/cvmobs dragon   |   /cvmobs dragon remove", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("Yaratık adları: crystal, overlord, overlord_clone, dragon",
+                NamedTextColor.DARK_GRAY));
+        sender.sendMessage(Component.text("sürüm: " + getPluginMeta().getVersion(),
+                NamedTextColor.DARK_GRAY));
     }
 }
