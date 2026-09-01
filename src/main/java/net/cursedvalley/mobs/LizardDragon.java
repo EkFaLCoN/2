@@ -10,12 +10,9 @@ import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
-import org.bukkit.boss.BarColor;
-import org.bukkit.boss.BarStyle;
-import org.bukkit.boss.BossBar;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
-import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.Giant;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -46,9 +43,9 @@ public final class LizardDragon {
 
     private final JavaPlugin plugin;
 
-    private EnderDragon dragon;
+    private Giant dragon;
     private BossState state;
-    private BossBar bar;
+    private final DragonModel model;
 
     // --- ayarlar ---
     private double maxHealth = 200_000;
@@ -62,6 +59,12 @@ public final class LizardDragon {
     private int fireballCount = 14;
     private double gustDamage = 12, gustRadius = 13, gustKnockback = 2.1;
     private double tailDamage = 24, tailRadius = 9;
+    private double biteDamage = 18, biteReach = 6.0;
+    private int biteCooldown = 22;
+    private double sightRange = 40;
+    private long lastBite;
+    private Location home;
+    private double leashRadius = 60;
     private int fireTicks = 100;
 
     private int tickCounter;
@@ -71,9 +74,18 @@ public final class LizardDragon {
 
     public LizardDragon(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.model = new DragonModel(plugin);
     }
 
     public void setArenaY(double y) { this.arenaY = y; }
+    public void setBite(double dmg, double reach, int cooldown) {
+        this.biteDamage = dmg; this.biteReach = reach; this.biteCooldown = Math.max(5, cooldown);
+    }
+    public void setSight(double v) { this.sightRange = Math.max(4, v); }
+    public void setLeash(Location home, double radius) {
+        this.home = home == null ? null : home.clone();
+        this.leashRadius = Math.max(10, radius);
+    }
 
     public void configure(double maxHealth, int spawnRadius, double hoverHeight,
                           int abilityInterval, double breathDamage, double breathRange,
@@ -117,34 +129,26 @@ public final class LizardDragon {
         double a = rnd.nextDouble() * Math.PI * 2;
         double r = spawnRadius * Math.sqrt(rnd.nextDouble());   // alana esit dagilim
         Location at = new Location(w, Math.cos(a) * r, arenaY, Math.sin(a) * r);
-        // Arena yeraltinda; yuzey degil, arena zemini referans alinir.
-        at = Ground.hoverNear(at, arenaY, hoverHeight);
+        // Ejder UCMAZ -- arena zeminine basar.
+        at = Ground.findNear(at, arenaY);
 
-        // Dogum sirasinda SADECE etiket verilir.
-        // getBossBar() ve setPhase() varlik dunyaya EKLENDIKTEN sonra calisir;
-        // spawn geri cagriminda cagrilirsa istisna firlatir.
-        dragon = w.spawn(at, EnderDragon.class, d -> d.addScoreboardTag(TAG));
-
-        try {
-            dragon.setPersistent(true);
-            // HOVER, portal/end savasi gerektirmez -- overworld icin guvenli faz.
-            dragon.setPhase(EnderDragon.Phase.HOVER);
-        } catch (Exception ex) {
-            plugin.getLogger().warning("Ejder fazı ayarlanamadı: " + ex.getMessage());
-        }
+        dragon = w.spawn(at, Giant.class, d -> d.addScoreboardTag(TAG));
+        dragon.setPersistent(true);
+        dragon.setRemoveWhenFarAway(false);
+        dragon.setSilent(true);
+        dragon.setInvisible(true);          // govdeyi kendi modelimiz cizer
 
         try {
             var mx = dragon.getAttribute(Attribute.MAX_HEALTH);
             if (mx != null) mx.setBaseValue(1024.0);
             dragon.setHealth(1024.0);
+            var sp = dragon.getAttribute(Attribute.MOVEMENT_SPEED);
+            if (sp != null) sp.setBaseValue(0.26);
+            // Giant vanilla'da devasa; rig kendi olceginde ciziliyor.
+            var sc = dragon.getAttribute(Attribute.SCALE);
+            if (sc != null) sc.setBaseValue(0.5);
         } catch (Exception ex) {
-            plugin.getLogger().warning("Ejder canı ayarlanamadı: " + ex.getMessage());
-        }
-
-        try {
-            if (dragon.getBossBar() != null) dragon.getBossBar().setVisible(false);
-        } catch (Exception ex) {
-            plugin.getLogger().warning("Vanilla ejder barı gizlenemedi: " + ex.getMessage());
+            plugin.getLogger().warning("Ejder nitelikleri ayarlanamadı: " + ex.getMessage());
         }
 
         state = new BossState("LIZARD DRAGON", maxHealth, true);
@@ -152,20 +156,16 @@ public final class LizardDragon {
         casting = false;
         abilityCounter = 0;
 
-        bar = Bukkit.createBossBar("", BarColor.RED, BarStyle.SEGMENTED_10);
-        bar.setVisible(true);
+        model.spawn(dragon);
         refreshBar();
 
-        w.playSound(at, Sound.ENTITY_ENDER_DRAGON_GROWL, SoundCategory.HOSTILE, 4.0f, 0.6f);
-        Bukkit.broadcast(Component.text("Lizard Dragon Cursed Valley semalarında belirdi!",
+        w.playSound(at, Sound.ENTITY_ENDER_DRAGON_GROWL, SoundCategory.HOSTILE, 4.0f, 0.55f);
+        Bukkit.broadcast(Component.text("Lizard Dragon Cursed Valley'de uyandı!",
                 NamedTextColor.RED));
     }
 
     public void remove() {
-        if (bar != null) {
-            bar.removeAll();
-            bar = null;
-        }
+        model.remove();
         if (dragon != null && !dragon.isDead()) dragon.remove();
         dragon = null;
         state = null;
@@ -176,6 +176,7 @@ public final class LizardDragon {
         for (Entity e : w.getEntities()) {
             if (e.getScoreboardTags().contains(TAG)) e.remove();
         }
+        DragonModel.cleanupLeftovers(w);
     }
 
     // ==================== CAN ====================
@@ -215,15 +216,10 @@ public final class LizardDragon {
         return null;
     }
 
+    /** Can bari ejderin USTUNDE yazi olarak durur; vanilla bossbar kullanilmaz. */
     private void refreshBar() {
-        if (bar == null || state == null) return;
-        double ratio = Math.max(0, Math.min(1, state.health() / state.maxHealth()));
-        bar.setProgress(ratio);
-        bar.setTitle("§cLizard Dragon  §f" + fmt(state.health()) + " / " + fmt(state.maxHealth()));
-    }
-
-    private static String fmt(double v) {
-        return String.format("%,d", Math.round(v)).replace(',', '.');
+        if (state == null) return;
+        model.setBar(state.bar());
     }
 
     // ==================== DONGU ====================
@@ -236,16 +232,6 @@ public final class LizardDragon {
         if (dragon.getHealth() < 1024.0) dragon.setHealth(1024.0);
 
         tickCounter++;
-
-        // Bar yalnizca yakindakilere gorunur.
-        if (bar != null) {
-            for (Player p : Bukkit.getOnlinePlayers()) {
-                boolean near = p.getWorld().equals(dragon.getWorld())
-                        && p.getLocation().distance(dragon.getLocation()) <= 90;
-                if (near && !bar.getPlayers().contains(p)) bar.addPlayer(p);
-                else if (!near && bar.getPlayers().contains(p)) bar.removePlayer(p);
-            }
-        }
 
         if (tickCounter % Math.max(1, regenSeconds) == 0) {
             state.heal(regenPerTick);
@@ -262,6 +248,53 @@ public final class LizardDragon {
             abilityCounter = 0;
             useAbility();
         }
+    }
+
+    /**
+     * Her tick: rig cizimi, hedef takibi ve yakin dovus.
+     *
+     * Giant'in vanilla AI'si YOKTUR -- yurumesi de vurmasi da burada elle
+     * yazilmistir. Yoksa ejder yerinde durur, sadece yetenek kullanirdi.
+     */
+    public void tick() {
+        if (!alive()) return;
+        model.tick(dragon);
+
+        if (casting) return;   // nefes sirasinda yerinde durur
+
+        Player target = nearestPlayer();
+        if (target == null) {
+            dragon.setTarget(null);
+            return;
+        }
+
+        dragon.setTarget(target);
+        double d = target.getLocation().distance(dragon.getLocation());
+
+        // Yuvadan cok uzaklastiysa geri doner -- arenanin disina cikmasin.
+        if (home != null && dragon.getLocation().distance(home) > leashRadius) {
+            dragon.getPathfinder().moveTo(home, 1.0);
+            return;
+        }
+
+        if (d > biteReach * 0.75) {
+            dragon.getPathfinder().moveTo(target, 1.0);
+        }
+
+        long now = dragon.getWorld().getFullTime();
+        if (d <= biteReach && now - lastBite >= biteCooldown) {
+            lastBite = now;
+            model.playBite();
+            dragon.getWorld().playSound(dragon.getLocation(),
+                    Sound.ENTITY_RAVAGER_BITE, SoundCategory.HOSTILE, 1.6f, 0.7f);
+            hurt(target, biteDamage);
+            target.setFireTicks(Math.max(target.getFireTicks(), fireTicks / 3));
+        }
+    }
+
+    private Player nearestPlayer() {
+        List<Player> near = nearbyPlayers(sightRange);
+        return near.isEmpty() ? null : near.get(0);
     }
 
     // ==================== YETENEKLER ====================
@@ -308,6 +341,7 @@ public final class LizardDragon {
 
         World w = origin.getWorld();
         w.playSound(origin, Sound.ENTITY_ENDER_DRAGON_SHOOT, SoundCategory.HOSTILE, 3.5f, 0.7f);
+        model.playRoar(40);
         Bukkit.broadcast(Component.text("Lizard Dragon nefesini topluyor...", NamedTextColor.GOLD));
 
         new org.bukkit.scheduler.BukkitRunnable() {

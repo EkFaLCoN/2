@@ -125,17 +125,15 @@ overlord:
 # Cursed Valley'in ates ejderi. /cvmobs dragon ile cagrilir,
 # /cvmobs dragon remove ile kaldirilir.
 #
-# 0,0 merkezli spawn-radius icinde rasgele bir noktada, hover-height
-# kadar yukseklikte belirir.
+# 0,0 merkezli spawn-radius icinde rasgele bir noktada arena ZEMININDE
+# belirir. UCMAZ -- dort ayak uzerinde yurur.
 #
 # HARITA KORUMASI: ejderin blok kirmasi, ates topu birakmasi ve zemini
 # tutusturmasi tamamen kapali. Tum hasar elle uygulanir.
 dragon:
-  max-health: 200000
+  max-health: 70000
   # 0,0'dan kac blok icinde dogsun
   spawn-radius: 40
-  # Zeminden kac blok yukarida belirsin
-  hover-height: 14.0
   # Arena zemin yuksekligi. Bowl yeraltinda oldugu icin dunyanin yuzeyi
   # kullanilamaz. Bos birakilirsa kristalin Y'si alinir.
   arena-y: -47
@@ -145,6 +143,14 @@ dragon:
   regen-seconds: 10
   # Degdigi oyuncu kac tick yansin
   fire-ticks: 100
+  # Bu kadar uzaktaki oyuncuyu fark edip pesine duser
+  sight-range: 40
+
+  # Yakin dovus: ejder UCMAZ, yurur ve isirir
+  bite:
+    damage: 18
+    reach: 6.0
+    cooldown-ticks: 22
 
   # Alev Nefesi: hedefe dogru koni. Yandan kacilabilir.
   breath:

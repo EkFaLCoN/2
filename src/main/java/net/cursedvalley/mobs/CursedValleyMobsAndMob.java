@@ -145,7 +145,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
      * Yeni bir ayar eklendiginde ya da bir varsayilan degistiginde sunucuda eski
      * deger okunmaya devam ediyordu (meteor sayisinin 11'de kalmasi bu yuzdendi).
      */
-    private static final int CONFIG_VERSION = 12;
+    private static final int CONFIG_VERSION = 13;
 
     // ==================== ACILIS ====================
 
@@ -163,6 +163,7 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         getServer().getScheduler().runTaskTimer(this, this::modelTick, 1L, 1L);
         getServer().getScheduler().runTaskTimer(this, lootChest::tick, 1L, 1L);
         getServer().getScheduler().runTaskTimer(this, clones::tick, 1L, 1L);
+        getServer().getScheduler().runTaskTimer(this, dragon::tick, 1L, 1L);
 
         getLogger().info("CursedValleyMobsAndMob v" + getPluginMeta().getVersion()
                 + " | macro koruması: kristal + tüm yaratıklar AÇIK");
@@ -245,9 +246,9 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
         unseenResetSeconds = Math.max(5, c.getInt("overlord.unseen-reset-seconds", 30));
 
         dragon.configure(
-                c.getDouble("dragon.max-health", 200_000),
+                c.getDouble("dragon.max-health", 70_000),
                 c.getInt("dragon.spawn-radius", 40),
-                c.getDouble("dragon.hover-height", 14.0),
+                0.0,   // kullanilmiyor: ejder ucmaz
                 c.getInt("dragon.ability-interval", 9),
                 c.getDouble("dragon.breath.damage", 20),
                 c.getDouble("dragon.breath.range", 22),
@@ -263,6 +264,12 @@ public final class CursedValleyMobsAndMob extends JavaPlugin implements Listener
                 c.getInt("dragon.fire-ticks", 100));
         // Ejder arenanin zemin yuksekligini bilmeli -- bowl yeraltinda.
         dragon.setArenaY(c.getDouble("dragon.arena-y", crystalY));
+        dragon.setBite(
+                c.getDouble("dragon.bite.damage", 18),
+                c.getDouble("dragon.bite.reach", 6.0),
+                c.getInt("dragon.bite.cooldown-ticks", 22));
+        dragon.setSight(c.getDouble("dragon.sight-range", 40));
+        dragon.setLeash(null, c.getDouble("overlord.leash-radius", 50.0));
         dragonRegen        = c.getDouble("dragon.regen-amount", 300);
         dragonRegenSeconds = Math.max(1, c.getInt("dragon.regen-seconds", 10));
 
