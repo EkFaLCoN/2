@@ -6,6 +6,8 @@
 #   - dosyalari dogrudan push ettiysen         -> calisir
 #   - bir alt klasore koyduysan                -> calisir
 #   - ZIP'i acmadan attiysan                   -> zip'i kendisi acar
+#     (sadece adi CursedValleyMobsAndMob ile baslayan zip'ler acilir;
+#      resourcepack zip'i depoda durabilir, karismaz)
 name: Build
 
 on:
@@ -25,7 +27,7 @@ jobs:
         run: |
           if ! find . -name pom.xml -not -path "*/target/*" | grep -q .; then
             echo "pom.xml yok, zip araniyor..."
-            for z in $(find . -name "*.zip" -not -path "./.git/*"); do
+            for z in $(find . -name "CursedValleyMobsAndMob*.zip" -not -path "./.git/*"); do
               echo "aciliyor: $z"
               unzip -q -o "$z" -d _kaynak
             done
@@ -62,6 +64,6 @@ jobs:
       - name: Jar'i yukle
         uses: actions/upload-artifact@v4
         with:
-          name: CursedValleyMobsAndMob
+          name: CursedValleyMobsAndMobs
           path: ${{ steps.find.outputs.dir }}/target/*.jar
           if-no-files-found: error
